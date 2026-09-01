@@ -42,7 +42,7 @@ export interface EditorState {
   setLayerOpacity: (layerId: string, opacity: number) => void;
   reorderLayer: (layerId: string, direction: "up" | "down") => void;
   createFrame: (opts?: { actor?: Actor }) => string;
-  duplicateFrame: (frameId?: string, opts?: { actor?: Actor }) => string;
+  duplicateFrame: (frameId?: string, opts?: { actor?: Actor }) => string | undefined;
   deleteFrame: (frameId: string, opts?: { actor?: Actor }) => void;
   selectFrame: (frameId: string, opts?: { actor?: Actor }) => void;
   setFrameDuration: (frameId: string, duration: number) => void;
@@ -173,7 +173,7 @@ export function createEditorStore(width = 32, height = 32) {
       });
     }
 
-    function logError(meta: CommitMeta, code: string, message: string) {
+    function logError(meta: CommitMeta, code: string, message: string): undefined {
       get().logActivity({ actor: meta.actor ?? "human", action: meta.action, description: `${code}: ${message}`, ok: false });
     }
 
@@ -309,7 +309,7 @@ export function createEditorStore(width = 32, height = 32) {
             ...st,
             activity: [
               ...st.activity,
-              { id: uid("act"), timestamp: Date.now(), actor: opts.actor ?? "human", action: "select_layer", description: `Layer not found: ${layerId}`, ok: false },
+              { id: uid("act"), timestamp: Date.now(), actor: opts.actor ?? ("human" as Actor), action: "select_layer", description: `Layer not found: ${layerId}`, ok: false },
             ].slice(-MAX_ACTIVITY),
           }));
           return;
@@ -427,7 +427,7 @@ export function createEditorStore(width = 32, height = 32) {
             ...st,
             activity: [
               ...st.activity,
-              { id: uid("act"), timestamp: Date.now(), actor: opts.actor ?? "human", action: "select_frame", description: `Frame not found: ${frameId}`, ok: false },
+              { id: uid("act"), timestamp: Date.now(), actor: opts.actor ?? ("human" as Actor), action: "select_frame", description: `Frame not found: ${frameId}`, ok: false },
             ].slice(-MAX_ACTIVITY),
           }));
           return;
@@ -570,7 +570,7 @@ export function createEditorStore(width = 32, height = 32) {
           future: [],
           activity: [
             ...s.activity,
-            { id: uid("act"), timestamp: Date.now(), actor: "human", action: "new_project", description: `New ${width}x${height} project`, ok: true },
+            { id: uid("act"), timestamp: Date.now(), actor: "human" as const, action: "new_project", description: `New ${width}x${height} project`, ok: true },
           ].slice(-MAX_ACTIVITY),
         }));
       },
@@ -589,7 +589,7 @@ export function createEditorStore(width = 32, height = 32) {
           future: [],
           activity: [
             ...s.activity,
-            { id: uid("act"), timestamp: Date.now(), actor: "human", action: "load_project", description: `Loaded ${data.width}x${data.height} project`, ok: true },
+            { id: uid("act"), timestamp: Date.now(), actor: "human" as const, action: "load_project", description: `Loaded ${data.width}x${data.height} project`, ok: true },
           ].slice(-MAX_ACTIVITY),
         }));
       },
@@ -606,7 +606,7 @@ export function createEditorStore(width = 32, height = 32) {
           future: [current, ...st.future].slice(0, MAX_HISTORY),
           activity: [
             ...st.activity,
-            { id: uid("act"), timestamp: Date.now(), actor: opts.actor ?? "human", action: "undo", description: `Undo: ${(st.activity[st.activity.length - 1]?.description ?? "last action")}`, ok: true },
+            { id: uid("act"), timestamp: Date.now(), actor: opts.actor ?? ("human" as Actor), action: "undo", description: `Undo: ${(st.activity[st.activity.length - 1]?.description ?? "last action")}`, ok: true },
           ].slice(-MAX_ACTIVITY),
         }));
       },
@@ -623,7 +623,7 @@ export function createEditorStore(width = 32, height = 32) {
           future: st.future.slice(1),
           activity: [
             ...st.activity,
-            { id: uid("act"), timestamp: Date.now(), actor: "human", action: "redo", description: `Redo: ${st.activity[st.activity.length - 1]?.description ?? "action"}`, ok: true },
+            { id: uid("act"), timestamp: Date.now(), actor: "human" as Actor, action: "redo", description: `Redo: ${st.activity[st.activity.length - 1]?.description ?? "action"}`, ok: true },
           ].slice(-MAX_ACTIVITY),
         }));
       },
