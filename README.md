@@ -6,7 +6,8 @@ PixelForge's editing experience is modeled after [Aseprite](https://www.aseprite
 
 PixelForge is a browser-based pixel-art editor built for the [WebMCP Challenge](https://webmcp.devpost.com/). It is not an "AI image generator": the AI agent **operates the editor itself** through [WebMCP](https://webmachinelearning.github.io/webmcp/) tools, using the exact same editor actions as the human. The agent draws pixels, manages layers and frames, recolors artwork, and exports sprite sheets — while every operation streams into a live activity panel and every one of them is undoable.
 
-**Live app:** https://endpx.github.io/pixelforge/
+**Live app:** https://pixelforge-webmcp.netlify.app
+**Mirror:** https://endpx.github.io/pixelforge/
 
 ## Why WebMCP
 
@@ -101,7 +102,7 @@ npm run build      # production build to dist/
    1. Open `chrome://flags/#enable-webmcp-testing` in the address bar
    2. Switch the dropdown from **Default** to **Enabled**
    3. Click **Relaunch** (bottom-right)
-   4. Open https://endpx.github.io/pixelforge/ — the header badge flips to **"WebMCP live · 19 tools"**
+   4. Open https://pixelforge-webmcp.netlify.app — the header badge flips to **"WebMCP live · 19 tools"**
    5. Optionally install the **Model Context Tool Inspector** extension from the Chrome Web Store to browse the registered tools, invoke them manually, and inspect the structured JSON results — it imitates how an agent sees the page
    6. If the flag is missing, update Chrome via `chrome://settings/help`; after a major Chrome update the flag may reset to Default (just re-enable it)
 3. **Any browser (manual QA)** — the page installs an honest debug bridge (it is *not* WebMCP):

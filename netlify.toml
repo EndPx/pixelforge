@@ -1,0 +1,3 @@
+# Static deploy config — `npx netlify-cli deploy --prod` publishes dist/
+[build]
+  publish = "dist"
