@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { EditorHeader } from "./components/editor/EditorHeader";
 import { Toolbar } from "./components/editor/Toolbar";
 import { Palette } from "./components/editor/Palette";
@@ -9,6 +8,7 @@ import { AgentPanel } from "./components/agent/AgentPanel";
 import { useEditorStore } from "./editor/store";
 import { registerWebMCPTools, installDebugBridge } from "./webmcp/registerTools";
 import { tryRestoreFromStorage } from "./editor/serialize";
+import { useEffect } from "react";
 
 installDebugBridge();
 
@@ -55,21 +55,31 @@ export default function App() {
   }, []);
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-zinc-950 text-zinc-200">
+    <div className="flex h-screen flex-col overflow-hidden bg-app text-ink">
       <EditorHeader />
       <div className="flex min-h-0 flex-1">
-        <aside className="flex w-52 shrink-0 flex-col gap-4 border-r border-zinc-800 bg-zinc-950 p-3">
+        {/* Aseprite-style left tool strip */}
+        <div className="flex w-11 shrink-0 flex-col items-center gap-1 border-r border-edge bg-panel py-2">
           <Toolbar />
+        </div>
+        {/* Palette column */}
+        <div className="w-44 shrink-0 overflow-y-auto border-r border-edge bg-panel">
           <Palette />
-        </aside>
-        <main className="flex min-w-0 flex-1 flex-col bg-[#16171d]">
+        </div>
+        {/* Editor center */}
+        <main className="flex min-w-0 flex-1 flex-col bg-editor">
           <Canvas />
-          <div className="grid grid-cols-1 gap-4 border-t border-zinc-800 bg-zinc-950/60 px-4 py-3 md:grid-cols-2">
-            <LayersPanel />
-            <Timeline />
+          <div className="grid shrink-0 grid-cols-[minmax(150px,220px)_1fr] gap-0 border-t border-edge bg-panel">
+            <div className="border-r border-edge p-2">
+              <LayersPanel />
+            </div>
+            <div className="min-w-0 p-2">
+              <Timeline />
+            </div>
           </div>
         </main>
-        <aside className="flex w-72 shrink-0 flex-col border-l border-zinc-800 bg-zinc-950">
+        {/* Agent panel — the WebMCP side of the product */}
+        <aside className="flex w-72 shrink-0 flex-col border-l border-edge bg-panel">
           <AgentPanel />
         </aside>
       </div>

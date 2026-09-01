@@ -52,21 +52,21 @@ export function Toolbar() {
   const setTool = useEditorStore((s) => s.setTool);
 
   return (
-    <div className="flex flex-row gap-1 md:flex-col">
+    <>
       {TOOLS.map((t) => (
         <button
           key={t.id}
           title={`${t.label} (${t.key})`}
           onClick={() => setTool(t.id)}
-          className={`flex h-9 w-9 items-center justify-center rounded-md transition-colors ${
+          className={`flex h-8 w-8 items-center justify-center border ${
             tool === t.id
-              ? "bg-sky-500/20 text-sky-300 ring-1 ring-sky-400/60"
-              : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+              ? "border-accent bg-accent-dim text-[#cfe6ff]"
+              : "border-transparent text-dim hover:border-edge2 hover:bg-panel3 hover:text-ink"
           }`}
         >
           {ICONS[t.id]}
         </button>
       ))}
-    </div>
+    </>
   );
 }

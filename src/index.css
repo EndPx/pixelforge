@@ -1,8 +1,24 @@
 @import "tailwindcss";
 
+/* PixelForge design tokens — a modern take on the classic Aseprite desktop-tool look:
+   flat dark-gray panels, square corners, 1px edges, dense compact chrome. */
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --color-app: #141417;
+  --color-panel: #1f1f24;
+  --color-panel2: #26262c;
+  --color-panel3: #2d2d34;
+  --color-edge: #38383f;
+  --color-edge2: #46464f;
+  --color-ink: #d4d4dc;
+  --color-dim: #8b8b96;
+  --color-faint: #5d5d68;
+  --color-editor: #313138;
+  --color-accent: #4f9eed;
+  --color-accent-dim: #2c4a68;
+  --color-agent: #9d7bf5;
 }
 
 html,
@@ -13,25 +29,63 @@ body,
 
 body {
   margin: 0;
-  background-color: #09090b;
-  color: #e4e4e7;
+  background-color: var(--color-app);
+  color: var(--color-ink);
   font-family: var(--font-sans);
+  font-size: 12px;
   -webkit-font-smoothing: antialiased;
+  user-select: none;
 }
 
 /* thin dark scrollbars */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #3f3f46 transparent;
+  scrollbar-color: var(--color-edge2) transparent;
 }
 *::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 *::-webkit-scrollbar-thumb {
-  background: #3f3f46;
-  border-radius: 4px;
+  background: var(--color-edge2);
 }
 *::-webkit-scrollbar-track {
   background: transparent;
+}
+
+/* Aseprite-style flat button */
+.pf-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 1px solid var(--color-edge2);
+  background: var(--color-panel2);
+  color: var(--color-ink);
+  padding: 2px 8px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.pf-btn:hover {
+  background: var(--color-panel3);
+}
+.pf-btn:active {
+  background: var(--color-edge);
+}
+.pf-btn:disabled {
+  opacity: 0.4;
+}
+.pf-btn.is-on {
+  border-color: var(--color-accent);
+  background: var(--color-accent-dim);
+  color: #cfe6ff;
+}
+
+/* section label like Aseprite mini headers */
+.pf-label {
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-dim);
+  font-weight: 600;
 }

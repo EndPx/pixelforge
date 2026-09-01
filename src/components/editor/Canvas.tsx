@@ -273,51 +273,55 @@ export function Canvas() {
     tool === "picker" ? "crosshair" : tool === "move" ? "move" : "crosshair";
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 p-4">
-      <div
-        ref={containerRef}
-        className="relative shadow-[0_0_0_1px_rgba(255,255,255,0.12),0_20px_60px_rgba(0,0,0,0.5)]"
-        style={{
-          width: width * zoom,
-          height: height * zoom,
-          cursor,
-          touchAction: "none",
-          background:
-            "repeating-conic-gradient(#2a2d3a 0% 25%, #22242e 0% 50%) 50% / 16px 16px",
-        }}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerLeave={() => {
-          hoverRef.current = null;
-          drawOverlay();
-        }}
-        onWheel={onWheel}
-      >
-        <canvas
-          ref={mainRef}
-          className="absolute inset-0 h-full w-full"
-          style={{ imageRendering: "pixelated", width: "100%", height: "100%" }}
-        />
-        <canvas ref={overlayRef} className="pointer-events-none absolute inset-0 h-full w-full" />
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden p-6">
+        <div
+          ref={containerRef}
+          className="relative shadow-[0_0_0_1px_rgba(0,0,0,0.6),0_0_0_2px_rgba(255,255,255,0.08)]"
+          style={{
+            width: width * zoom,
+            height: height * zoom,
+            cursor,
+            touchAction: "none",
+            background:
+              "repeating-conic-gradient(#3a3a41 0% 25%, #303036 0% 50%) 50% / 16px 16px",
+          }}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerLeave={() => {
+            hoverRef.current = null;
+            drawOverlay();
+          }}
+          onWheel={onWheel}
+        >
+          <canvas
+            ref={mainRef}
+            className="absolute inset-0 h-full w-full"
+            style={{ imageRendering: "pixelated", width: "100%", height: "100%" }}
+          />
+          <canvas ref={overlayRef} className="pointer-events-none absolute inset-0 h-full w-full" />
+        </div>
       </div>
-      <div className="flex items-center gap-2 text-xs text-zinc-400">
-        <button
-          className="rounded border border-zinc-700 bg-zinc-800 px-2 py-0.5 hover:bg-zinc-700"
-          onClick={() => useEditorStore.getState().setZoom(zoom - 2)}
-        >
-          −
-        </button>
-        <span className="w-12 text-center tabular-nums">{zoom * 100 / 16}%</span>
-        <button
-          className="rounded border border-zinc-700 bg-zinc-800 px-2 py-0.5 hover:bg-zinc-700"
-          onClick={() => useEditorStore.getState().setZoom(zoom + 2)}
-        >
-          +
-        </button>
-        <span className="ml-2 text-zinc-500">
-          {width}×{height} · {tool}
+      {/* Aseprite-style status bar */}
+      <div className="flex shrink-0 items-center gap-4 border-t border-edge bg-panel px-3 py-1 text-[11px] text-dim">
+        <span className="font-mono text-ink">
+          {hoverRef.current ? `${hoverRef.current.x}, ${hoverRef.current.y}` : "—"}
         </span>
+        <div className="flex items-center gap-1">
+          <button className="pf-btn px-1.5" onClick={() => useEditorStore.getState().setZoom(zoom - 2)}>
+            −
+          </button>
+          <span className="w-12 text-center tabular-nums">{Math.round((zoom / 16) * 100)}%</span>
+          <button className="pf-btn px-1.5" onClick={() => useEditorStore.getState().setZoom(zoom + 2)}>
+            +
+          </button>
+        </div>
+        <span className="ml-auto">
+          {width} × {height}
+        </span>
+        <span>·</span>
+        <span className="capitalize">{tool}</span>
       </div>
     </div>
   );

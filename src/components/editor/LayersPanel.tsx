@@ -25,10 +25,10 @@ function LayerThumb({ layerId }: { layerId: string }) {
   return (
     <canvas
       ref={ref}
-      className="h-8 w-8 rounded ring-1 ring-white/15"
+      className="h-6 w-6 shrink-0 border border-edge2"
       style={{
         imageRendering: "pixelated",
-        background: "repeating-conic-gradient(#2a2d3a 0% 25%, #22242e 0% 50%) 50% / 8px 8px",
+        background: "repeating-conic-gradient(#3a3a41 0% 25%, #303036 0% 50%) 50% / 6px 6px",
       }}
     />
   );
@@ -46,42 +46,38 @@ export function LayersPanel() {
   const layersTopFirst = [...frame.layers].reverse();
 
   return (
-    <div className="flex min-h-0 flex-col gap-1.5">
+    <div className="flex min-h-0 flex-col gap-1">
       <div className="flex items-center justify-between">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">Layers</span>
-        <div className="flex gap-1">
-          <button
-            title="Add layer"
-            onClick={() => store.getState().createLayer()}
-            className="rounded px-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
-          >
+        <span className="pf-label">Layers</span>
+        <div className="flex gap-0.5">
+          <button title="Add layer" onClick={() => store.getState().createLayer()} className="pf-btn h-5 w-5 p-0 text-xs">
             +
           </button>
           <button
             title="Move up"
             onClick={() => store.getState().reorderLayer(activeLayerId, "up")}
-            className="rounded px-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+            className="pf-btn h-5 w-5 p-0 text-xs"
           >
             ↑
           </button>
           <button
             title="Move down"
             onClick={() => store.getState().reorderLayer(activeLayerId, "down")}
-            className="rounded px-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+            className="pf-btn h-5 w-5 p-0 text-xs"
           >
             ↓
           </button>
         </div>
       </div>
-      <div className="flex min-h-0 flex-col gap-1 overflow-y-auto">
+      <div className="flex min-h-0 flex-col gap-px overflow-y-auto border border-edge bg-edge">
         {layersTopFirst.map((layer: Layer) => {
           const active = layer.id === activeLayerId;
           return (
             <div
               key={layer.id}
               onClick={() => store.getState().selectLayer(layer.id)}
-              className={`group flex cursor-pointer items-center gap-2 rounded-md px-1.5 py-1 ${
-                active ? "bg-sky-500/15 ring-1 ring-sky-400/50" : "hover:bg-zinc-800/70"
+              className={`group flex cursor-pointer items-center gap-1.5 px-1 py-0.5 ${
+                active ? "bg-accent-dim" : "bg-panel2 hover:bg-panel3"
               }`}
             >
               <button
@@ -90,7 +86,7 @@ export function LayersPanel() {
                   e.stopPropagation();
                   store.getState().toggleLayerVisibility(layer.id);
                 }}
-                className={`text-xs ${layer.visible ? "text-zinc-300" : "text-zinc-600"}`}
+                className={`w-4 text-center text-[10px] ${layer.visible ? "text-ink" : "text-faint"}`}
               >
                 {layer.visible ? "●" : "○"}
               </button>
@@ -108,11 +104,11 @@ export function LayersPanel() {
                   onKeyDown={(e) => {
                     if (e.key === "Enter") (e.target as HTMLInputElement).blur();
                   }}
-                  className="min-w-0 flex-1 rounded border border-sky-500 bg-zinc-900 px-1 text-xs text-zinc-200 focus:outline-none"
+                  className="min-w-0 flex-1 border border-accent bg-app px-1 text-xs text-ink focus:outline-none"
                 />
               ) : (
                 <span
-                  className="min-w-0 flex-1 truncate text-xs text-zinc-300"
+                  className="min-w-0 flex-1 truncate text-xs text-ink"
                   onDoubleClick={(e) => {
                     e.stopPropagation();
                     setRenamingId(layer.id);
@@ -129,7 +125,7 @@ export function LayersPanel() {
                     e.stopPropagation();
                     store.getState().deleteLayer(layer.id);
                   }}
-                  className="hidden text-xs text-zinc-500 hover:text-red-400 group-hover:block"
+                  className="hidden px-1 text-xs text-dim hover:text-red-400 group-hover:block"
                 >
                   ✕
                 </button>
@@ -138,15 +134,15 @@ export function LayersPanel() {
           );
         })}
       </div>
-      <div className="flex items-center gap-2 pt-0.5">
-        <span className="text-[10px] text-zinc-500">Opacity</span>
+      <div className="flex items-center gap-1.5">
+        <span className="pf-label">Opacity</span>
         <input
           type="range"
           min={0}
           max={100}
           value={Math.round(getActiveLayer({ frames, activeFrameId, activeLayerId }).opacity * 100)}
           onChange={(e) => store.getState().setLayerOpacity(activeLayerId, Number(e.target.value) / 100)}
-          className="h-1 flex-1 accent-sky-400"
+          className="h-1 flex-1 accent-[#4f9eed]"
         />
       </div>
     </div>

@@ -18,12 +18,12 @@ export function Palette() {
   };
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-2 p-2">
       <div className="flex items-center gap-2">
         <label
-          className="relative h-8 w-8 shrink-0 cursor-pointer rounded-md ring-1 ring-white/20"
+          className="relative h-9 w-9 shrink-0 cursor-pointer border border-edge2"
           style={{ backgroundColor: activeColor }}
-          title="Active color"
+          title="Active color — click to open picker"
         >
           <input
             type="color"
@@ -32,34 +32,39 @@ export function Palette() {
             className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
           />
         </label>
-        <div className="grid grid-cols-8 gap-1">
+        <div className="min-w-0">
+          <div className="pf-label">Color</div>
+          <div className="font-mono text-[11px] text-ink">{activeColor}</div>
+        </div>
+      </div>
+
+      <div>
+        <div className="pf-label mb-1">Palette</div>
+        <div className="grid grid-cols-6 gap-px border border-edge bg-edge p-px">
           {palette.map((c) => (
             <button
               key={c}
               onClick={() => setActiveColor(c)}
               title={c}
-              className={`h-5 w-5 rounded-sm ring-1 transition-transform hover:scale-110 ${
-                activeColor === c ? "ring-2 ring-sky-400" : "ring-white/15"
+              className={`h-5 w-full border ${
+                activeColor === c ? "border-accent z-10" : "border-transparent hover:border-white/40"
               }`}
               style={{ backgroundColor: c }}
             />
           ))}
         </div>
       </div>
-      <div className="flex items-center gap-1.5">
+
+      <div className="flex items-center gap-1">
         <input
           value={custom}
           onChange={(e) => setCustom(e.target.value)}
           placeholder="#38b764"
-          className="w-20 rounded border border-zinc-700 bg-zinc-900 px-1.5 py-0.5 font-mono text-[11px] text-zinc-300 focus:border-sky-500 focus:outline-none"
+          className="w-full min-w-0 border border-edge2 bg-app px-1.5 py-1 font-mono text-[11px] text-ink focus:border-accent focus:outline-none"
         />
-        <button
-          onClick={addColor}
-          className="rounded border border-zinc-700 bg-zinc-800 px-2 py-0.5 text-[11px] text-zinc-300 hover:bg-zinc-700"
-        >
-          + Add
+        <button onClick={addColor} className="pf-btn shrink-0 text-[11px]">
+          +
         </button>
-        <span className="ml-auto font-mono text-[11px] text-zinc-500">{activeColor}</span>
       </div>
     </div>
   );

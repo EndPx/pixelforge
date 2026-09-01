@@ -20,10 +20,10 @@ function FrameThumb({ frame, size }: { frame: Frame; size: { w: number; h: numbe
   return (
     <canvas
       ref={ref}
-      className="h-10 w-10 rounded ring-1 ring-white/15"
+      className="h-8 w-8 border border-edge2"
       style={{
         imageRendering: "pixelated",
-        background: "repeating-conic-gradient(#2a2d3a 0% 25%, #22242e 0% 50%) 50% / 8px 8px",
+        background: "repeating-conic-gradient(#3a3a41 0% 25%, #303036 0% 50%) 50% / 6px 6px",
       }}
     />
   );
@@ -38,6 +38,8 @@ export function Timeline() {
   const [playing, setPlaying] = useState(false);
   const playIndexRef = useRef(0);
 
+  const activeIndex = frames.findIndex((f) => f.id === activeFrameId);
+
   useEffect(() => {
     if (!playing) return;
     const tick = () => {
@@ -51,58 +53,71 @@ export function Timeline() {
     return () => clearInterval(timer);
   }, [playing, frames, activeFrameId, store]);
 
+  const jump = (delta: number) => {
+    if (frames.length === 0) return;
+    const next = (activeIndex + delta + frames.length) % frames.length;
+    setPlaying(false);
+    store.getState().selectFrame(frames[next].id);
+  };
+
   return (
-    <div className="flex min-h-0 flex-col gap-1.5">
+    <div className="flex min-h-0 flex-col gap-1">
       <div className="flex items-center justify-between">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
-          Timeline · {frames.length} frame{frames.length === 1 ? "" : "s"}
-        </span>
-        <div className="flex items-center gap-1">
-          <button
-            title={playing ? "Pause" : "Play animation"}
-            onClick={() => setPlaying((p) => !p)}
-            className={`rounded px-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 ${playing ? "text-sky-300" : ""}`}
-          >
-            {playing ? "❚❚" : "▶"}
-          </button>
-          <button
-            title="Duplicate frame"
-            onClick={() => store.getState().duplicateFrame()}
-            className="rounded px-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
-          >
+        <div className="flex items-center gap-2">
+          <span className="pf-label">Frames</span>
+          <div className="flex gap-0.5">
+            <button title="First frame" onClick={() => jump(-activeIndex)} className="pf-btn h-5 w-5 p-0 text-[10px]">
+              ⇤
+            </button>
+            <button title="Previous frame" onClick={() => jump(-1)} className="pf-btn h-5 w-5 p-0 text-[10px]">
+              ◀
+            </button>
+            <button
+              title={playing ? "Pause" : "Play"}
+              onClick={() => setPlaying((p) => !p)}
+              className={`pf-btn h-5 w-5 p-0 text-[10px] ${playing ? "is-on" : ""}`}
+            >
+              {playing ? "❚❚" : "▶"}
+            </button>
+            <button title="Next frame" onClick={() => jump(1)} className="pf-btn h-5 w-5 p-0 text-[10px]">
+              ▶
+            </button>
+            <button title="Last frame" onClick={() => jump(frames.length - 1 - activeIndex)} className="pf-btn h-5 w-5 p-0 text-[10px]">
+              ⇥
+            </button>
+          </div>
+        </div>
+        <div className="flex gap-0.5">
+          <button title="Duplicate frame" onClick={() => store.getState().duplicateFrame()} className="pf-btn h-5 w-5 p-0 text-xs">
             ⧉
           </button>
-          <button
-            title="Add empty frame"
-            onClick={() => store.getState().createFrame()}
-            className="rounded px-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
-          >
+          <button title="Add empty frame" onClick={() => store.getState().createFrame()} className="pf-btn h-5 w-5 p-0 text-xs">
             +
           </button>
         </div>
       </div>
-      <div className="flex min-h-0 items-center gap-1.5 overflow-x-auto pb-1">
+      <div className="flex min-h-0 items-stretch gap-px overflow-x-auto border border-edge bg-edge p-px">
         {frames.map((frame, i) => {
           const active = frame.id === activeFrameId;
           return (
-            <div key={frame.id} className="group relative">
+            <div key={frame.id} className="group relative shrink-0">
               <button
                 onClick={() => {
                   setPlaying(false);
                   store.getState().selectFrame(frame.id);
                 }}
-                className={`relative flex flex-col items-center gap-0.5 rounded-md p-1 ${
-                  active ? "bg-sky-500/15 ring-1 ring-sky-400/60" : "hover:bg-zinc-800/70"
+                className={`flex h-full flex-col items-center gap-0.5 px-1 py-0.5 ${
+                  active ? "bg-accent-dim outline outline-1 outline-accent" : "bg-panel2 hover:bg-panel3"
                 }`}
               >
                 <FrameThumb frame={frame} size={{ w: width, h: height }} />
-                <span className={`text-[10px] ${active ? "text-sky-300" : "text-zinc-500"}`}>{i + 1}</span>
+                <span className={`text-[10px] ${active ? "text-[#cfe6ff]" : "text-dim"}`}>{i + 1}</span>
               </button>
               {frames.length > 1 && (
                 <button
                   title="Delete frame"
                   onClick={() => store.getState().deleteFrame(frame.id)}
-                  className="absolute -right-1 -top-1 hidden h-4 w-4 items-center justify-center rounded-full bg-zinc-700 text-[9px] text-zinc-300 hover:bg-red-500 hover:text-white group-hover:flex"
+                  className="absolute -right-1 -top-1 hidden h-3.5 w-3.5 items-center justify-center border border-edge2 bg-panel3 text-[8px] text-ink hover:border-red-500 hover:text-red-400 group-hover:flex"
                 >
                   ✕
                 </button>
