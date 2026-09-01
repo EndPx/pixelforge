@@ -109,20 +109,20 @@ export function Palette() {
           <label
             className="absolute bottom-0 left-0 h-7 w-7 cursor-pointer border border-edge2"
             style={{ backgroundColor: secondaryColor }}
-            title={`Sekunder ${secondaryColor} — klik kanan di canvas`}
+            title={`Secondary ${secondaryColor} — right-click on canvas`}
           >
             <input type="color" value={secondaryColor} onChange={(e) => setSecondaryColor(e.target.value)} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
           </label>
           <label
             className="absolute right-0 top-0 h-7 w-7 cursor-pointer border border-white/40 shadow-[2px_2px_5px_rgba(0,0,0,0.6)]"
             style={{ backgroundColor: activeColor }}
-            title={`Utama ${activeColor}`}
+            title={`Primary ${activeColor}`}
           >
             <input type="color" value={activeColor} onChange={(e) => setActiveColor(e.target.value)} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
           </label>
         </div>
         <div className="flex min-w-0 flex-col gap-1">
-          <button onClick={swapColors} title="Tukar warna (X)" className="pf-btn text-[11px]">⇄ Tukar</button>
+          <button onClick={swapColors} title="Swap colors (X)" className="pf-btn text-[11px]">⇄ Swap</button>
           <span className="font-mono text-[10px] leading-3 text-dim">{activeColor}</span>
         </div>
       </div>
@@ -182,7 +182,7 @@ export function Palette() {
       />
 
       <div>
-        <div className="pf-label mb-1">Palet</div>
+        <div className="pf-label mb-1">Palette</div>
         <div className="grid grid-cols-6 gap-px overflow-hidden rounded-md border border-edge bg-edge p-px">
           {palette.map((c) => (
             <button
@@ -202,7 +202,7 @@ export function Palette() {
 
       <div className="flex items-center gap-1">
         <select
-          title="Muat palet siap pakai"
+          title="Load a ready-made palette"
           defaultValue=""
           onChange={(e) => {
             const preset = PALETTE_PRESETS[e.target.value];
@@ -211,17 +211,17 @@ export function Palette() {
           }}
           className="min-w-0 flex-1 rounded-lg border border-edge2 bg-app px-1.5 py-1 text-[11px] text-ink focus:border-accent focus:outline-none"
         >
-          <option value="" disabled>Palet siap pakai…</option>
+          <option value="" disabled>Load palette…</option>
           {Object.keys(PALETTE_PRESETS).map((name) => (
             <option key={name} value={name}>{name}</option>
           ))}
         </select>
         <button
           onClick={() => addPaletteColor(activeColor)}
-          title="Simpan warna aktif ke palet"
+          title="Add the active color to the palette"
           className="pf-btn shrink-0 text-[11px]"
         >
-          + Simpan
+          + Add
         </button>
       </div>
     </div>

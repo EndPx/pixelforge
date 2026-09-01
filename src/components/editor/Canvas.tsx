@@ -61,7 +61,6 @@ export function Canvas() {
   const brushSize = useEditorStore((s) => s.brushSize);
   const gridVisible = useEditorStore((s) => s.gridVisible);
   const onionSkin = useEditorStore((s) => s.onionSkin);
-  const tiledMode = useEditorStore((s) => s.tiledMode);
 
   const mainRef = useRef<HTMLCanvasElement>(null);
   const underlayRef = useRef<HTMLCanvasElement>(null);
@@ -82,8 +81,6 @@ export function Canvas() {
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [coords, setCoords] = useState<{ x: number; y: number } | null>(null);
   const workspaceRef = useRef<HTMLDivElement>(null);
-  const rulerTopRef = useRef<HTMLCanvasElement>(null);
-  const rulerLeftRef = useRef<HTMLCanvasElement>(null);
 
   const frame = getActiveFrame({ frames, activeFrameId });
   const frameIndex = frames.findIndex((f) => f.id === frame.id);
@@ -100,7 +97,7 @@ export function Canvas() {
     ctx.putImageData(renderFrameToImageData(frame, width, height, ctx), 0, 0);
   }, [frame, width, height]);
 
-  // onion skin underlay (previous = bluish ghost, next = reddish ghost, Aseprite-style)
+  // onion skin underlay (previous = bluish ghost, next = reddish ghost)
   useEffect(() => {
     const canvas = underlayRef.current;
     if (!canvas) return;
@@ -143,7 +140,7 @@ export function Canvas() {
       if (!ctx) return;
       ctx.clearRect(0, 0, w, h);
 
-      // pixel grid (View > Grid, off by default like Aseprite)
+      // pixel grid (View > Pixel grid, off by default)
       if (gridVisible && zoom >= 6) {
         ctx.strokeStyle = "rgba(0,0,0,0.22)";
         ctx.lineWidth = 1;
@@ -251,7 +248,7 @@ export function Canvas() {
     return () => cancelAnimationFrame(raf);
   }, [selection, drawOverlay]);
 
-  // space = pan modifier (Aseprite-style hand tool)
+  // space = pan modifier (hand tool)
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.code === "Space") spaceDownRef.current = true;
@@ -398,7 +395,7 @@ export function Canvas() {
     drawOverlay();
   };
 
-  // Pixelorama-style zoom, anchored at the cursor position
+  // Zoom anchored at the cursor position (consistent at every zoom level)
   useEffect(() => {
     const el = workspaceRef.current;
     if (!el) return;
@@ -444,113 +441,31 @@ export function Canvas() {
     return () => ro.disconnect();
   }, [fitToWindow]);
 
-  // MenuBar > Tampilan > Sesuaikan jendela
+  // MenuBar > View > Fit to window
   useEffect(() => {
     const handler = () => fitToWindow();
     document.addEventListener("pixelforge:fit", handler);
     return () => document.removeEventListener("pixelforge:fit", handler);
   }, [fitToWindow]);
 
-  // --- Pixelorama-style rulers ---
-  const drawRulers = useCallback(() => {
-    const top = rulerTopRef.current;
-    const left = rulerLeftRef.current;
-    const marker = coords;
-    const paint = (
-      canvas: HTMLCanvasElement | null,
-      length: number,
-      thickness: number,
-      isTop: boolean,
-    ) => {
-      if (!canvas) return;
-      canvas.width = isTop ? length : thickness;
-      canvas.height = isTop ? thickness : length;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-      ctx.fillStyle = "#1f1f24";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.strokeStyle = "#4a4a55";
-      ctx.fillStyle = "#9a9aa6";
-      ctx.font = "9px ui-monospace, monospace";
-      ctx.lineWidth = 1;
-      const step = zoom >= 8 ? 1 : zoom >= 4 ? 5 : 10;
-      for (let unit = 0; unit <= length / zoom; unit += step) {
-        const pos = unit * zoom;
-        const major = unit % 10 === 0;
-        ctx.beginPath();
-        if (isTop) {
-          ctx.moveTo(pos + 0.5, thickness - (major ? 8 : 4));
-          ctx.lineTo(pos + 0.5, thickness);
-        } else {
-          ctx.moveTo(thickness - (major ? 8 : 4), pos + 0.5);
-          ctx.lineTo(thickness, pos + 0.5);
-        }
-        ctx.stroke();
-        if (major && unit > 0) {
-          if (isTop) ctx.fillText(String(unit), pos + 2, 9);
-          else ctx.fillText(String(unit), 2, pos + 10);
-        }
-      }
-      // cursor marker
-      if (marker) {
-        const m = (isTop ? marker.x : marker.y) * zoom;
-        ctx.strokeStyle = "#6c8cff";
-        ctx.beginPath();
-        if (isTop) {
-          ctx.moveTo(m + 0.5, 0);
-          ctx.lineTo(m + 0.5, thickness);
-        } else {
-          ctx.moveTo(0, m + 0.5);
-          ctx.lineTo(thickness, m + 0.5);
-        }
-        ctx.stroke();
-      }
-    };
-    paint(top, width * zoom, 20, true);
-    paint(left, height * zoom, 28, false);
-  }, [width, height, zoom, coords]);
-
-  useEffect(() => {
-    drawRulers();
-  }, [drawRulers]);
-
   const panning = spaceDownRef.current;
   const cursor = panning ? "grab" : tool === "picker" ? "crosshair" : tool === "move" ? "move" : "crosshair";
 
-  // Pixelorama-style checker: 8 canvas px per square, clamped to 16..128 screen px
-  const checker = Math.max(16, Math.min(128, 8 * zoom));
+  // Consistent checkerboard: always 8 canvas px per square, scaling linearly with zoom
+  const checker = 8 * zoom;
 
   return (
-    <div ref={workspaceRef} className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-workspace">
-      {/* Pixelorama-style info strip */}
-      <div className="pf-card absolute right-3 top-3 z-20 flex items-center gap-2 px-2.5 py-1 text-[11px] text-dim">
-        <span className="font-mono text-ink">{Math.round((zoom / 16) * 100)}%</span>
-        <span className="text-faint">|</span>
-        <span className="font-mono">[{width}×{height}]</span>
-        <span className="text-faint">|</span>
-        <span className="font-mono">{coords ? `${coords.x}, ${coords.y}` : "—"}</span>
-        <button className="pf-btn ml-1 px-2 py-0.5 text-[10px]" onClick={fitToWindow} title="Sesuaikan ke jendela">
-          Fit
-        </button>
-      </div>
-
+    <div ref={workspaceRef} className="flex min-h-0 flex-1 flex-col overflow-hidden bg-workspace">
       <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden p-6">
-        <div style={{ transform: `translate(${pan.x}px, ${pan.y}px)` }}>
-          {/* top ruler */}
-          <div className="flex">
-            <div className="h-5 w-7 shrink-0 border-b border-r border-edge bg-panel" />
-            <canvas ref={rulerTopRef} className="block" />
-          </div>
-          <div className="flex">
-            <canvas ref={rulerLeftRef} className="block" />
-            <div
+        <div
           ref={containerRef}
-          className="relative shadow-[0_0_0_1px_rgba(0,0,0,0.55)]"
+          className="relative border border-black/60"
           style={{
             width: width * zoom,
             height: height * zoom,
             cursor,
             touchAction: "none",
+            transform: `translate(${pan.x}px, ${pan.y}px)`,
             background: `repeating-conic-gradient(#939393 0% 25%, #7d7d7d 0% 50%) 50% / ${checker * 2}px ${checker * 2}px`,
           }}
           onPointerDown={onPointerDown}
@@ -574,67 +489,30 @@ export function Canvas() {
             style={{ imageRendering: "pixelated", width: "100%", height: "100%" }}
           />
           <canvas ref={overlayRef} className="pointer-events-none absolute inset-0 h-full w-full" />
-            </div>
-          </div>
         </div>
       </div>
-      {/* status bar */}
-      <div className="flex shrink-0 items-center gap-3 border-t border-edge bg-panel px-3 py-1 text-[11px] text-dim">
+      {/* LibreSprite-style status bar */}
+      <div className="flex shrink-0 items-center gap-4 border-t border-edge bg-panel px-3 py-1 text-[11px] text-dim">
         <span className="font-mono text-ink">{coords ? `${coords.x}, ${coords.y}` : "—"}</span>
         {selection && (
           <span className="font-mono text-faint">
             sel {selection.width}×{selection.height}
           </span>
         )}
-        <div className="flex items-center gap-1">
-          <button className="pf-btn px-1.5" onClick={() => useEditorStore.getState().setZoom(zoom - 2)}>
-            −
-          </button>
-          <span className="w-12 text-center tabular-nums">{Math.round((zoom / 16) * 100)}%</span>
-          <button className="pf-btn px-1.5" onClick={() => useEditorStore.getState().setZoom(zoom + 2)}>
-            +
-          </button>
-        </div>
-        {/* brush size */}
-        <div className="flex items-center gap-0.5">
-          {[1, 2, 3, 4].map((s) => (
-            <button
-              key={s}
-              title={`Brush size ${s}`}
-              onClick={() => useEditorStore.getState().setBrushSize(s)}
-              className={`pf-btn h-5 w-5 p-0 ${brushSize === s ? "is-on" : ""}`}
-            >
-              <span className="block rounded-full bg-current" style={{ width: s * 2 + 2, height: s * 2 + 2 }} />
-            </button>
-          ))}
-        </div>
-        {/* view toggles */}
-        <button
-          title="Toggle pixel grid (')"
-          onClick={() => useEditorStore.getState().toggleGrid()}
-          className={`pf-btn ${gridVisible ? "is-on" : ""}`}
-        >
-          Grid
+        <span>
+          {width} × {height}
+        </span>
+        <span className="ml-auto">Frame: {frameIndex + 1}</span>
+        <button className="pf-btn px-1.5" onClick={() => useEditorStore.getState().setZoom(zoom - 2)}>
+          −
         </button>
-        <button
-          title="Toggle onion skin (O)"
-          onClick={() => useEditorStore.getState().toggleOnionSkin()}
-          className={`pf-btn ${onionSkin ? "is-on" : ""}`}
-        >
-          Onion
+        <span className="w-12 text-center tabular-nums text-ink">{Math.round((zoom / 16) * 100)}%</span>
+        <button className="pf-btn px-1.5" onClick={() => useEditorStore.getState().setZoom(zoom + 2)}>
+          +
         </button>
-        <button
-          title="Tiled mode — drawing wraps around the canvas edges"
-          onClick={() => useEditorStore.getState().toggleTiledMode()}
-          className={`pf-btn ${tiledMode ? "is-on" : ""}`}
-        >
-          Tile
+        <button className="pf-btn px-2 py-0.5 text-[10px]" onClick={fitToWindow} title="Fit to window">
+          Fit
         </button>
-        <span className="ml-auto">Frame {frameIndex + 1}</span>
-        <span>/</span>
-        <span>{frames.length}</span>
-        <span>·</span>
-        <span className="capitalize">{tool}</span>
       </div>
     </div>
   );

@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { EditorHeader } from "./components/editor/EditorHeader";
 import { MenuBar } from "./components/editor/MenuBar";
 import { Toolbar } from "./components/editor/Toolbar";
 import { Palette } from "./components/editor/Palette";
-import { ToolOptions } from "./components/editor/ToolOptions";
+import { PreviewPanel } from "./components/editor/PreviewPanel";
 import { Canvas } from "./components/editor/Canvas";
 import { CelTimeline } from "./components/editor/CelTimeline";
 import { AgentPanel } from "./components/agent/AgentPanel";
@@ -30,6 +30,25 @@ function useKeyboardShortcuts() {
         store.redo();
         return;
       }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "a") {
+        e.preventDefault();
+        store.selectAll();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "d") {
+        e.preventDefault();
+        store.deselect();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        import("./editor/serialize").then((m) => m.saveProject(store));
+        return;
+      }
+      if (e.key === "Enter" && !e.ctrlKey && !e.metaKey) {
+        store.setPlaying(!store.isPlaying);
+        return;
+      }
       if (e.ctrlKey || e.metaKey) return;
       switch (e.key.toLowerCase()) {
         case "b": store.setTool("pencil"); break;
@@ -50,63 +69,125 @@ function useKeyboardShortcuts() {
   }, []);
 }
 
+function BrushSizeControl() {
+  const brushSize = useEditorStore((s) => s.brushSize);
+  const tool = useEditorStore((s) => s.tool);
+  return (
+    <div className="flex items-center gap-2 text-[11px] text-dim">
+      <span className="capitalize text-ink">{tool}</span>
+      <span className="text-edge2">|</span>
+      <span>Brush size</span>
+      <button className="pf-btn px-1.5" onClick={() => useEditorStore.getState().setBrushSize(brushSize - 1)} disabled={brushSize <= 1}>
+        −
+      </button>
+      <span className="w-6 text-center font-mono text-ink">{brushSize}</span>
+      <button className="pf-btn px-1.5" onClick={() => useEditorStore.getState().setBrushSize(brushSize + 1)} disabled={brushSize >= 8}>
+        +
+      </button>
+    </div>
+  );
+}
+
 export default function App() {
   useKeyboardShortcuts();
   const [agentOpen, setAgentOpen] = useState(true);
+  const timelineVisible = useEditorStore((s) => s.timelineVisible);
+  const previewVisible = useEditorStore((s) => s.previewVisible);
+  const [timelineHeight, setTimelineHeight] = useState(240);
+  const dragRef = useRef<{ startY: number; startH: number } | null>(null);
 
   useEffect(() => {
     tryRestoreFromStorage(useEditorStore.getState());
     void registerWebMCPTools();
   }, []);
 
+  useEffect(() => {
+    const move = (e: PointerEvent) => {
+      if (!dragRef.current) return;
+      const h = dragRef.current.startH + (dragRef.current.startY - e.clientY);
+      setTimelineHeight(Math.max(140, Math.min(460, h)));
+    };
+    const up = () => (dragRef.current = null);
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+  }, []);
+
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-app text-ink">
+      {/* row 1: app header */}
       <EditorHeader agentOpen={agentOpen} onToggleAgent={() => setAgentOpen((v) => !v)} />
-      <div className="shrink-0 border-b border-edge/70 px-3 pb-1.5">
+      {/* row 2: menu bar */}
+      <div className="shrink-0 border-b border-edge px-2 pb-1">
         <MenuBar onFit={() => document.dispatchEvent(new CustomEvent("pixelforge:fit"))} />
       </div>
+      {/* row 3: tool options (LibreSprite-style context bar) */}
+      <div className="flex shrink-0 items-center gap-3 border-b border-edge bg-panel px-3 py-1">
+        <BrushSizeControl />
+        <span className="text-[10px] text-faint">Right-click paints with the secondary color · Space+drag pans · Scroll zooms</span>
+      </div>
 
-      <div className="flex min-h-0 flex-1 gap-2 p-2">
-        {/* floating left column: tools + colors + tool options */}
-        <aside className="pf-card flex w-48 shrink-0 flex-col overflow-y-auto">
-          <div className="border-b border-edge/70 p-2">
-            <Toolbar />
-          </div>
+      {/* row 4: docks + canvas */}
+      <div className="flex min-h-0 flex-1 gap-1 p-1">
+        {/* left dock: colors */}
+        <aside className="pf-card flex w-48 shrink-0 flex-col overflow-hidden">
           <div className="min-h-0 flex-1 overflow-y-auto">
             <Palette />
           </div>
-          <div className="border-t border-edge/70">
-            <ToolOptions />
-          </div>
+          {previewVisible && (
+            <div className="border-t border-edge/70">
+              <PreviewPanel />
+            </div>
+          )}
         </aside>
 
-        {/* canvas workspace */}
-        <main className="pf-card min-w-0 flex-1 overflow-hidden !rounded-xl">
+        {/* canvas */}
+        <main className="flex min-w-0 flex-1 flex-col overflow-hidden border border-edge bg-editor">
           <Canvas />
         </main>
 
-        {/* collapsible agent panel */}
-        {agentOpen && (
-          <aside className="pf-card flex w-72 shrink-0 flex-col overflow-hidden">
-            <AgentPanel onClose={() => setAgentOpen(false)} />
+        {/* right: tool strip + agent panel */}
+        <div className="flex shrink-0 gap-1">
+          <aside className="pf-card flex w-10 flex-col items-center py-1.5">
+            <Toolbar />
           </aside>
-        )}
+          {agentOpen && (
+            <aside className="pf-card flex w-72 shrink-0 flex-col overflow-hidden">
+              <AgentPanel onClose={() => setAgentOpen(false)} />
+            </aside>
+          )}
+        </div>
       </div>
 
       {!agentOpen && (
         <button
           onClick={() => setAgentOpen(true)}
-          title="Tampilkan panel agent"
-          className="fixed right-3 top-1/2 z-30 -translate-y-1/2 rounded-l-xl border border-edge2 bg-panel2 px-1.5 py-3 text-sm text-dim shadow-lg hover:text-ink"
+          title="Show agent panel"
+          className="fixed right-2 top-1/2 z-30 -translate-y-1/2 rounded-l border border-edge2 bg-panel2 px-1 py-3 text-sm text-dim hover:text-ink"
         >
           🤖
         </button>
       )}
 
-      {/* cel timeline */}
-      <div className="pf-card mx-2 mb-2 h-44 shrink-0 overflow-hidden">
-        <CelTimeline />
-      </div>
+      {/* row 5: resizable timeline */}
+      {timelineVisible && (
+        <>
+          <div
+            className="h-1.5 shrink-0 cursor-row-resize bg-edge hover:bg-accent"
+            onPointerDown={(e) => {
+              (e.target as HTMLElement).setPointerCapture(e.pointerId);
+              dragRef.current = { startY: e.clientY, startH: timelineHeight };
+            }}
+            title="Drag to resize the timeline"
+          />
+          <div className="pf-card mx-1 mb-1 shrink-0 overflow-hidden" style={{ height: timelineHeight }}>
+            <CelTimeline />
+          </div>
+        </>
+      )}
     </div>
   );
 }

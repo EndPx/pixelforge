@@ -50,7 +50,7 @@ export function AgentPanel({ onClose }: { onClose?: () => void }) {
         <div className="flex items-center gap-1.5">
           <span className="text-[10px] text-faint">{agentEntries.length} ops</span>
           {onClose && (
-            <button onClick={onClose} title="Sembunyikan panel agent" className="pf-btn h-5 w-5 p-0 text-[10px]">
+            <button onClick={onClose} title="Hide agent panel" className="pf-btn h-5 w-5 p-0 text-[10px]">
               ✕
             </button>
           )}

@@ -48,6 +48,8 @@ export interface ActivityEntry {
 }
 
 export interface EditorSnapshot {
+  width: number;
+  height: number;
   frames: Frame[];
   activeFrameId: string;
   activeLayerId: string;

@@ -38,7 +38,7 @@ export function CelTimeline() {
   const activeFrameId = useEditorStore((s) => s.activeFrameId);
   const activeLayerId = useEditorStore((s) => s.activeLayerId);
   const store = useEditorStore;
-  const [playing, setPlaying] = useState(false);
+  const playing = useEditorStore((s) => s.isPlaying);
   const [renamingLayer, setRenamingLayer] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
 
@@ -61,7 +61,7 @@ export function CelTimeline() {
   const jump = (delta: number) => {
     if (frames.length === 0) return;
     const next = (activeIndex + delta + frames.length) % frames.length;
-    setPlaying(false);
+    store.getState().setPlaying(false);
     store.getState().selectFrame(frames[next].id);
   };
 
@@ -74,7 +74,7 @@ export function CelTimeline() {
           <button title="Previous frame" onClick={() => jump(-1)} className="pf-btn h-5 w-5 p-0 text-[10px]">◀</button>
           <button
             title={playing ? "Pause" : "Play"}
-            onClick={() => setPlaying((p) => !p)}
+            onClick={() => store.getState().setPlaying(!playing)}
             className={`pf-btn h-5 w-5 p-0 text-[10px] ${playing ? "is-on" : ""}`}
           >
             {playing ? "❚❚" : "▶"}
@@ -215,7 +215,7 @@ export function CelTimeline() {
                 <button
                   key={f.id}
                   onClick={() => {
-                    setPlaying(false);
+                    store.getState().setPlaying(false);
                     store.getState().selectFrame(f.id);
                   }}
                   className={`w-11 shrink-0 border-r border-edge/60 px-0 py-0.5 text-center text-[10px] ${
@@ -235,7 +235,7 @@ export function CelTimeline() {
                     <button
                       key={f.id}
                       onClick={() => {
-                        setPlaying(false);
+                        store.getState().setPlaying(false);
                         store.getState().selectLayer(layer.id);
                         store.getState().selectFrame(f.id);
                       }}

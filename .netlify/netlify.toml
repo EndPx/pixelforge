@@ -8,7 +8,7 @@ redirects = []
 
 [build]
 publish = "D:\\Belajar\\Hackacton\\Hackacton yang masih jalan\\WebMCP\\pixelforge\\dist"
-publishOrigin = "ui"
+publishOrigin = "config"
 commandOrigin = "ui"
 command = "npm run build"
 
