@@ -51,6 +51,7 @@ export interface EditorState {
   deleteFrame: (frameId: string, opts?: { actor?: Actor }) => void;
   selectFrame: (frameId: string, opts?: { actor?: Actor }) => void;
   setFrameDuration: (frameId: string, duration: number) => void;
+  setFrameRate: (fps: number) => void;
   selectRegion: (rect: Rect, opts?: { actor?: Actor }) => void;
   clearRegion: (opts?: { actor?: Actor }) => void;
   moveRegion: (dx: number, dy: number, opts?: { actor?: Actor }) => void;
@@ -491,6 +492,14 @@ export function createEditorStore(width = 32, height = 32) {
             activeFrameId: frameId,
             activeLayerId: match?.id ?? newFrame.layers[newFrame.layers.length - 1].id,
           };
+        });
+      },
+
+      setFrameRate: (fps) => {
+        const meta: CommitMeta = { action: "set_frame_rate", description: `Animation speed: ${fps} FPS` };
+        const duration = Math.round(1000 / Math.max(1, Math.min(60, fps)));
+        commit(meta, (draft) => {
+          for (const f of draft.frames) f.duration = duration;
         });
       },
 

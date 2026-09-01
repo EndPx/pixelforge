@@ -22,7 +22,7 @@ const TOOL_ICONS: Record<string, string> = {
   export_sprite_sheet: "📦",
 };
 
-export function AgentPanel() {
+export function AgentPanel({ onClose }: { onClose?: () => void }) {
   const activity = useEditorStore((s) => s.activity);
   const past = useEditorStore((s) => s.past.length);
   const future = useEditorStore((s) => s.future.length);
@@ -47,7 +47,14 @@ export function AgentPanel() {
           </span>
           <span className="pf-label">Agent Activity</span>
         </span>
-        <span className="text-[10px] text-faint">{agentEntries.length} agent ops</span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] text-faint">{agentEntries.length} ops</span>
+          {onClose && (
+            <button onClick={onClose} title="Sembunyikan panel agent" className="pf-btn h-5 w-5 p-0 text-[10px]">
+              ✕
+            </button>
+          )}
+        </div>
       </div>
 
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto p-1">

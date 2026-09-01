@@ -1,9 +1,5 @@
-import { useState } from "react";
-import { useEditorStore, getActiveFrame } from "../../editor/store";
-import { exportCurrentFrame, exportSpriteSheet, exportGif } from "../../editor/export";
-import { CANVAS_PRESETS } from "../../types";
+import { useEditorStore } from "../../editor/store";
 import { TOOL_DEFS } from "../../webmcp/tools";
-import { saveProject, loadProject } from "../../editor/serialize";
 
 function WebMCPBadge() {
   const available = useEditorStore((s) => s.webmcpAvailable);
@@ -11,11 +7,11 @@ function WebMCPBadge() {
     <span
       title={
         available
-          ? "WebMCP connected — agent tools are live on this page"
-          : "WebMCP API not detected. Open in ChatGPT's in-app browser, or Chrome with chrome://flags/#enable-webmcp-testing"
+          ? "WebMCP terhubung — tools agent aktif di halaman ini"
+          : "API WebMCP tidak terdeteksi. Buka lewat browser ChatGPT, atau Chrome dengan chrome://flags/#enable-webmcp-testing"
       }
-      className={`flex items-center gap-1.5 border px-2 py-0.5 text-[11px] ${
-        available ? "border-emerald-500/50 bg-emerald-950/50 text-emerald-300" : "border-edge2 bg-panel2 text-dim"
+      className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] ${
+        available ? "bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-400/40" : "bg-panel2 text-dim ring-1 ring-edge2"
       }`}
     >
       <span className={`h-1.5 w-1.5 rounded-full ${available ? "animate-pulse bg-emerald-400" : "bg-faint"}`} />
@@ -24,98 +20,34 @@ function WebMCPBadge() {
   );
 }
 
-export function EditorHeader() {
-  const store = useEditorStore;
-  const width = useEditorStore((s) => s.width);
-  const height = useEditorStore((s) => s.height);
-  const frames = useEditorStore((s) => s.frames);
-  const activeFrameId = useEditorStore((s) => s.activeFrameId);
-  const [sizeMenu, setSizeMenu] = useState(false);
-
-  const frame = getActiveFrame({ frames, activeFrameId });
-
+export function EditorHeader({ agentOpen, onToggleAgent }: { agentOpen: boolean; onToggleAgent: () => void }) {
   return (
-    <header className="flex shrink-0 items-center gap-2 border-b border-edge bg-panel px-2 py-1.5">
-      <div className="flex items-center gap-1.5">
-        <div className="grid h-6 w-6 grid-cols-2 grid-rows-2 gap-px border border-edge2">
-          <span className="bg-sky-400" />
-          <span className="bg-violet-400" />
+    <header className="flex shrink-0 items-center gap-2 px-3 py-2">
+      <div className="flex items-center gap-2">
+        <div className="grid h-7 w-7 grid-cols-2 grid-rows-2 gap-px overflow-hidden rounded-lg ring-1 ring-white/15">
+          <span className="bg-accent" />
+          <span className="bg-agent" />
           <span className="bg-emerald-400" />
           <span className="bg-amber-300" />
         </div>
         <div className="leading-none">
-          <span className="block text-xs font-bold tracking-tight text-ink">PixelForge</span>
-          <span className="block text-[8px] uppercase tracking-[0.18em] text-faint">agent-native pixel studio</span>
+          <span className="block text-sm font-bold tracking-tight text-ink">PixelForge</span>
+          <span className="block text-[8px] uppercase tracking-[0.2em] text-faint">agent-native pixel studio</span>
         </div>
       </div>
 
-      <div className="mx-1 h-5 w-px bg-edge" />
-
-      <div className="relative">
-        <button onClick={() => setSizeMenu((v) => !v)} className="pf-btn text-[11px]">
-          New {width}×{height} ▾
-        </button>
-        {sizeMenu && (
-          <div className="absolute left-0 top-full z-20 mt-0.5 w-28 border border-edge2 bg-panel3 p-px shadow-xl">
-            {CANVAS_PRESETS.map((size) => (
-              <button
-                key={size}
-                onClick={() => {
-                  store.getState().newProject(size, size);
-                  setSizeMenu(false);
-                }}
-                className="block w-full px-2 py-1 text-left text-[11px] text-ink hover:bg-accent-dim"
-              >
-                {size} × {size}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <button onClick={() => saveProject(store.getState())} className="pf-btn text-[11px]">
-        Save
-      </button>
-      <button onClick={() => loadProject(store.getState())} className="pf-btn text-[11px]">
-        Open
-      </button>
-
-      <div className="mx-1 h-5 w-px bg-edge" />
-
-      <button onClick={() => exportCurrentFrame(width, height, frame)} className="pf-btn text-[11px]">
-        PNG
-      </button>
-      <button
-        onClick={() => {
-          const result = exportGif(width, height, frames, 4);
-          store.getState().logActivity({
-            actor: "human" as const,
-            action: "export_animation_gif",
-            description: `Exported animated GIF (${result.frameCount} frames)`,
-            ok: true,
-          });
-        }}
-        className="pf-btn text-[11px]"
-      >
-        GIF
-      </button>
-      <button
-        onClick={() => {
-          const result = exportSpriteSheet(width, height, frames, frames.length);
-          store.getState().logActivity({
-            actor: "human",
-            action: "export_sprite_sheet",
-            description: `Exported sprite sheet (${result.frameCount} frames)`,
-            ok: true,
-          });
-        }}
-        className="pf-btn text-[11px]"
-      >
-        Sprite sheet
-      </button>
-
-      <div className="ml-auto">
+      <div className="ml-auto flex items-center gap-2">
         <WebMCPBadge />
+        <button
+          onClick={onToggleAgent}
+          title={agentOpen ? "Sembunyikan panel agent" : "Tampilkan panel agent"}
+          className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] ring-1 transition-colors ${
+            agentOpen ? "bg-accent-dim text-[#cfe0ff] ring-accent/50" : "bg-panel2 text-dim ring-edge2 hover:text-ink"
+          }`}
+        >
+          🤖 Agent
+          <span className={`text-[9px] ${agentOpen ? "rotate-180" : ""} transition-transform`}>▶</span>
+        </button>
       </div>
     </header>
   );

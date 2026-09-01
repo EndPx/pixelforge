@@ -81,6 +81,9 @@ export function Canvas() {
   const spaceDownRef = useRef(false);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [coords, setCoords] = useState<{ x: number; y: number } | null>(null);
+  const workspaceRef = useRef<HTMLDivElement>(null);
+  const rulerTopRef = useRef<HTMLCanvasElement>(null);
+  const rulerLeftRef = useRef<HTMLCanvasElement>(null);
 
   const frame = getActiveFrame({ frames, activeFrameId });
   const frameIndex = frames.findIndex((f) => f.id === frame.id);
@@ -395,19 +398,152 @@ export function Canvas() {
     drawOverlay();
   };
 
-  const onWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-    const store = useEditorStore.getState();
-    store.setZoom(store.zoom + (e.deltaY < 0 ? 2 : -2));
-  };
+  // Pixelorama-style zoom, anchored at the cursor position
+  useEffect(() => {
+    const el = workspaceRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const store = useEditorStore.getState();
+      const container = containerRef.current;
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      const cx = (e.clientX - rect.left) / store.zoom; // content px under cursor
+      const cy = (e.clientY - rect.top) / store.zoom;
+      const nz = Math.max(2, Math.min(40, store.zoom + (e.deltaY < 0 ? 2 : -2)));
+      setPan((p) => ({ x: p.x + cx * (store.zoom - nz), y: p.y + cy * (store.zoom - nz) }));
+      store.setZoom(nz);
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
+
+  const fitToWindow = useCallback(() => {
+    const ws = workspaceRef.current;
+    if (!ws || ws.clientWidth === 0) return;
+    const nz = Math.max(2, Math.min(40, Math.floor(Math.min((ws.clientWidth - 100) / width, (ws.clientHeight - 90) / height) / 2) * 2));
+    // flex centering already centers the canvas; fit = right zoom + zero pan
+    setPan({ x: 0, y: 0 });
+    useEditorStore.getState().setZoom(nz);
+  }, [width, height]);
+
+  // re-fit when the canvas size changes (new project)
+  useEffect(() => {
+    fitToWindow();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [width, height]);
+
+  // re-fit once the workspace reaches its real layout size (panels settling, resize)
+  useEffect(() => {
+    const ws = workspaceRef.current;
+    if (!ws) return;
+    const ro = new ResizeObserver(() => {
+      if (ws.clientWidth > 100) fitToWindow();
+    });
+    ro.observe(ws);
+    return () => ro.disconnect();
+  }, [fitToWindow]);
+
+  // MenuBar > Tampilan > Sesuaikan jendela
+  useEffect(() => {
+    const handler = () => fitToWindow();
+    document.addEventListener("pixelforge:fit", handler);
+    return () => document.removeEventListener("pixelforge:fit", handler);
+  }, [fitToWindow]);
+
+  // --- Pixelorama-style rulers ---
+  const drawRulers = useCallback(() => {
+    const top = rulerTopRef.current;
+    const left = rulerLeftRef.current;
+    const marker = coords;
+    const paint = (
+      canvas: HTMLCanvasElement | null,
+      length: number,
+      thickness: number,
+      isTop: boolean,
+    ) => {
+      if (!canvas) return;
+      canvas.width = isTop ? length : thickness;
+      canvas.height = isTop ? thickness : length;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      ctx.fillStyle = "#1f1f24";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.strokeStyle = "#4a4a55";
+      ctx.fillStyle = "#9a9aa6";
+      ctx.font = "9px ui-monospace, monospace";
+      ctx.lineWidth = 1;
+      const step = zoom >= 8 ? 1 : zoom >= 4 ? 5 : 10;
+      for (let unit = 0; unit <= length / zoom; unit += step) {
+        const pos = unit * zoom;
+        const major = unit % 10 === 0;
+        ctx.beginPath();
+        if (isTop) {
+          ctx.moveTo(pos + 0.5, thickness - (major ? 8 : 4));
+          ctx.lineTo(pos + 0.5, thickness);
+        } else {
+          ctx.moveTo(thickness - (major ? 8 : 4), pos + 0.5);
+          ctx.lineTo(thickness, pos + 0.5);
+        }
+        ctx.stroke();
+        if (major && unit > 0) {
+          if (isTop) ctx.fillText(String(unit), pos + 2, 9);
+          else ctx.fillText(String(unit), 2, pos + 10);
+        }
+      }
+      // cursor marker
+      if (marker) {
+        const m = (isTop ? marker.x : marker.y) * zoom;
+        ctx.strokeStyle = "#6c8cff";
+        ctx.beginPath();
+        if (isTop) {
+          ctx.moveTo(m + 0.5, 0);
+          ctx.lineTo(m + 0.5, thickness);
+        } else {
+          ctx.moveTo(0, m + 0.5);
+          ctx.lineTo(thickness, m + 0.5);
+        }
+        ctx.stroke();
+      }
+    };
+    paint(top, width * zoom, 20, true);
+    paint(left, height * zoom, 28, false);
+  }, [width, height, zoom, coords]);
+
+  useEffect(() => {
+    drawRulers();
+  }, [drawRulers]);
 
   const panning = spaceDownRef.current;
   const cursor = panning ? "grab" : tool === "picker" ? "crosshair" : tool === "move" ? "move" : "crosshair";
 
+  // Pixelorama-style checker: 8 canvas px per square, clamped to 16..128 screen px
+  const checker = Math.max(16, Math.min(128, 8 * zoom));
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div ref={workspaceRef} className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-workspace">
+      {/* Pixelorama-style info strip */}
+      <div className="pf-card absolute right-3 top-3 z-20 flex items-center gap-2 px-2.5 py-1 text-[11px] text-dim">
+        <span className="font-mono text-ink">{Math.round((zoom / 16) * 100)}%</span>
+        <span className="text-faint">|</span>
+        <span className="font-mono">[{width}×{height}]</span>
+        <span className="text-faint">|</span>
+        <span className="font-mono">{coords ? `${coords.x}, ${coords.y}` : "—"}</span>
+        <button className="pf-btn ml-1 px-2 py-0.5 text-[10px]" onClick={fitToWindow} title="Sesuaikan ke jendela">
+          Fit
+        </button>
+      </div>
+
       <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden p-6">
-        <div
+        <div style={{ transform: `translate(${pan.x}px, ${pan.y}px)` }}>
+          {/* top ruler */}
+          <div className="flex">
+            <div className="h-5 w-7 shrink-0 border-b border-r border-edge bg-panel" />
+            <canvas ref={rulerTopRef} className="block" />
+          </div>
+          <div className="flex">
+            <canvas ref={rulerLeftRef} className="block" />
+            <div
           ref={containerRef}
           className="relative shadow-[0_0_0_1px_rgba(0,0,0,0.55)]"
           style={{
@@ -415,9 +551,7 @@ export function Canvas() {
             height: height * zoom,
             cursor,
             touchAction: "none",
-            transform: `translate(${pan.x}px, ${pan.y}px)`,
-            // Aseprite-style screen-space checkerboard: fixed size, light gray
-            background: "repeating-conic-gradient(#b9b9b9 0% 25%, #a6a6a6 0% 50%) 50% / 16px 16px",
+            background: `repeating-conic-gradient(#939393 0% 25%, #7d7d7d 0% 50%) 50% / ${checker * 2}px ${checker * 2}px`,
           }}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
@@ -428,7 +562,6 @@ export function Canvas() {
             setCoords(null);
             drawOverlay();
           }}
-          onWheel={onWheel}
         >
           <canvas
             ref={underlayRef}
@@ -441,9 +574,11 @@ export function Canvas() {
             style={{ imageRendering: "pixelated", width: "100%", height: "100%" }}
           />
           <canvas ref={overlayRef} className="pointer-events-none absolute inset-0 h-full w-full" />
+            </div>
+          </div>
         </div>
       </div>
-      {/* Aseprite-style status bar */}
+      {/* status bar */}
       <div className="flex shrink-0 items-center gap-3 border-t border-edge bg-panel px-3 py-1 text-[11px] text-dim">
         <span className="font-mono text-ink">{coords ? `${coords.x}, ${coords.y}` : "—"}</span>
         {selection && (

@@ -2,7 +2,7 @@
 
 > **An agent-native pixel art studio** — where humans and AI agents collaborate on the same canvas.
 
-PixelForge's editing experience is modeled after [Aseprite](https://www.aseprite.org/) and its open-source fork [LibreSprite](https://github.com/LibreSprite/LibreSprite): cel-based layers × frames animation, onion skinning, live previews, ready-made palettes and tiled drawing — with WebMCP as a first-class second interface to all of it.
+The editing experience follows the classic pixel-art studio model: cel-based layers × frames animation, onion skinning, a live preview, ready-made palettes, tiled drawing and rulers — with WebMCP as a first-class second interface to all of it.
 
 PixelForge is a browser-based pixel-art editor built for the [WebMCP Challenge](https://webmcp.devpost.com/). It is not an "AI image generator": the AI agent **operates the editor itself** through [WebMCP](https://webmachinelearning.github.io/webmcp/) tools, using the exact same editor actions as the human. The agent draws pixels, manages layers and frames, recolors artwork, and exports sprite sheets — while every operation streams into a live activity panel and every one of them is undoable.
 

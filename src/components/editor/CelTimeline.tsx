@@ -94,6 +94,29 @@ export function CelTimeline() {
             ✕
           </button>
         </div>
+        <div className="ml-2 flex items-center gap-1" title="Kecepatan animasi (semua frame)">
+          <button
+            onClick={() => {
+              const fps = Math.round(1000 / (frames[0]?.duration ?? 300));
+              store.getState().setFrameRate(Math.max(1, fps - 1));
+            }}
+            className="pf-btn h-5 w-5 p-0 text-xs"
+          >
+            −
+          </button>
+          <span className="w-12 text-center font-mono text-[10px] text-dim">
+            {Math.round(1000 / (frames[0]?.duration ?? 300))} FPS
+          </span>
+          <button
+            onClick={() => {
+              const fps = Math.round(1000 / (frames[0]?.duration ?? 300));
+              store.getState().setFrameRate(Math.min(60, fps + 1));
+            }}
+            className="pf-btn h-5 w-5 p-0 text-xs"
+          >
+            +
+          </button>
+        </div>
         <span className="pf-label ml-2">Layers × Frames</span>
         <div className="ml-auto flex items-center gap-1">
           <button title="New layer" onClick={() => store.getState().createLayer()} className="pf-btn h-5 w-5 p-0 text-xs">+</button>
