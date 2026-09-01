@@ -1,6 +1,7 @@
 import { EditorHeader } from "./components/editor/EditorHeader";
 import { Toolbar } from "./components/editor/Toolbar";
 import { Palette } from "./components/editor/Palette";
+import { PreviewPanel } from "./components/editor/PreviewPanel";
 import { Canvas } from "./components/editor/Canvas";
 import { LayersPanel } from "./components/editor/LayersPanel";
 import { Timeline } from "./components/editor/Timeline";
@@ -39,6 +40,9 @@ function useKeyboardShortcuts() {
         case "m": store.setTool("move"); break;
         case "[": store.setZoom(store.zoom - 2); break;
         case "]": store.setZoom(store.zoom + 2); break;
+        case "x": store.swapColors(); break;
+        case "'": store.toggleGrid(); break;
+        case "o": store.toggleOnionSkin(); break;
       }
     };
     window.addEventListener("keydown", onKey);
@@ -63,8 +67,11 @@ export default function App() {
           <Toolbar />
         </div>
         {/* Palette column */}
-        <div className="w-44 shrink-0 overflow-y-auto border-r border-edge bg-panel">
+        <div className="flex w-44 shrink-0 flex-col overflow-y-auto border-r border-edge bg-panel">
           <Palette />
+          <div className="mt-auto border-t border-edge">
+            <PreviewPanel />
+          </div>
         </div>
         {/* Editor center */}
         <main className="flex min-w-0 flex-1 flex-col bg-editor">

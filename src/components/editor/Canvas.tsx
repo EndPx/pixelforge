@@ -32,6 +32,21 @@ function bresenham(x0: number, y0: number, x1: number, y1: number): { x: number;
   return points;
 }
 
+/** Expand a point to an NxN brush block, clamped to the canvas. */
+function brushBlock(x: number, y: number, size: number, width: number, height: number): { x: number; y: number }[] {
+  if (size <= 1) return [{ x, y }];
+  const half = Math.floor(size / 2);
+  const out: { x: number; y: number }[] = [];
+  for (let dy = 0; dy < size; dy++) {
+    for (let dx = 0; dx < size; dx++) {
+      const px = x + dx - half;
+      const py = y + dy - half;
+      if (px >= 0 && px < width && py >= 0 && py < height) out.push({ x: px, y: py });
+    }
+  }
+  return out;
+}
+
 export function Canvas() {
   const width = useEditorStore((s) => s.width);
   const height = useEditorStore((s) => s.height);
@@ -42,24 +57,34 @@ export function Canvas() {
   const selection = useEditorStore((s) => s.selection);
   const tool = useEditorStore((s) => s.tool);
   const activeColor = useEditorStore((s) => s.activeColor);
+  const secondaryColor = useEditorStore((s) => s.secondaryColor);
+  const brushSize = useEditorStore((s) => s.brushSize);
+  const gridVisible = useEditorStore((s) => s.gridVisible);
+  const onionSkin = useEditorStore((s) => s.onionSkin);
 
   const mainRef = useRef<HTMLCanvasElement>(null);
+  const underlayRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const strokeRef = useRef<Map<number, PixelInput>>(new Map());
   const strokeActiveRef = useRef(false);
+  const strokeButtonRef = useRef<number>(0); // 0 = left (primary), 2 = right (secondary/erase)
   const lastPointRef = useRef<{ x: number; y: number } | null>(null);
   const selectStartRef = useRef<{ x: number; y: number } | null>(null);
   const selectPreviewRef = useRef<Rect | null>(null);
   const moveStartRef = useRef<{ x: number; y: number } | null>(null);
   const moveOffsetRef = useRef<{ dx: number; dy: number } | null>(null);
   const hoverRef = useRef<{ x: number; y: number } | null>(null);
+  const panStartRef = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
+  const spaceDownRef = useRef(false);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
   const [coords, setCoords] = useState<{ x: number; y: number } | null>(null);
 
   const frame = getActiveFrame({ frames, activeFrameId });
+  const frameIndex = frames.findIndex((f) => f.id === frame.id);
 
-  // composite render
+  // main composite render
   useEffect(() => {
     const canvas = mainRef.current;
     if (!canvas) return;
@@ -71,88 +96,172 @@ export function Canvas() {
     ctx.putImageData(renderFrameToImageData(frame, width, height, ctx), 0, 0);
   }, [frame, width, height]);
 
-  const drawOverlay = useCallback(() => {
-    const canvas = overlayRef.current;
+  // onion skin underlay (previous = bluish ghost, next = reddish ghost, Aseprite-style)
+  useEffect(() => {
+    const canvas = underlayRef.current;
     if (!canvas) return;
-    const w = width * zoom;
-    const h = height * zoom;
-    if (canvas.width !== w || canvas.height !== h) {
-      canvas.width = w;
-      canvas.height = h;
-    }
+    canvas.width = width;
+    canvas.height = height;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    ctx.clearRect(0, 0, w, h);
-
-    // grid
-    if (zoom >= 8) {
-      ctx.strokeStyle = "rgba(255,255,255,0.06)";
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      for (let x = 1; x < width; x++) {
-        ctx.moveTo(x * zoom + 0.5, 0);
-        ctx.lineTo(x * zoom + 0.5, h);
-      }
-      for (let y = 1; y < height; y++) {
-        ctx.moveTo(0, y * zoom + 0.5);
-        ctx.lineTo(w, y * zoom + 0.5);
-      }
-      ctx.stroke();
+    ctx.clearRect(0, 0, width, height);
+    if (!onionSkin) return;
+    const neighbors: [FrameNeighbor, string][] = [
+      [-1, "rgba(80,140,255,0.35)"],
+      [1, "rgba(255,90,90,0.3)"],
+    ];
+    for (const [offset, tint] of neighbors) {
+      const nf = frames[frameIndex + offset];
+      if (!nf) continue;
+      const tmp = document.createElement("canvas");
+      tmp.width = width;
+      tmp.height = height;
+      const tctx = tmp.getContext("2d")!;
+      tctx.putImageData(renderFrameToImageData(nf, width, height, tctx), 0, 0);
+      tctx.globalCompositeOperation = "source-in";
+      tctx.fillStyle = tint;
+      tctx.fillRect(0, 0, width, height);
+      ctx.drawImage(tmp, 0, 0);
     }
+  }, [frames, frameIndex, width, height, onionSkin]);
 
-    // stroke preview
-    if (strokeActiveRef.current && strokeRef.current.size > 0) {
-      const eraser = tool === "eraser";
-      for (const p of strokeRef.current.values()) {
-        const rgba = hexToRgba(eraser ? "#ffffff" : p.color ?? activeColor);
-        if (!rgba) continue;
-        ctx.fillStyle = `rgba(${rgba.r},${rgba.g},${rgba.b},${eraser ? 0.5 : rgba.a})`;
-        ctx.fillRect(p.x * zoom, p.y * zoom, zoom, zoom);
-        if (eraser) {
-          ctx.strokeStyle = "rgba(255,80,80,0.9)";
-          ctx.lineWidth = 1;
-          ctx.strokeRect(p.x * zoom + 0.5, p.y * zoom + 0.5, zoom - 1, zoom - 1);
+  const drawOverlay = useCallback(
+    (dashOffset = 0) => {
+      const canvas = overlayRef.current;
+      if (!canvas) return;
+      const w = width * zoom;
+      const h = height * zoom;
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w;
+        canvas.height = h;
+      }
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      ctx.clearRect(0, 0, w, h);
+
+      // pixel grid (View > Grid, off by default like Aseprite)
+      if (gridVisible && zoom >= 6) {
+        ctx.strokeStyle = "rgba(0,0,0,0.22)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (let x = 1; x < width; x++) {
+          ctx.moveTo(x * zoom + 0.5, 0);
+          ctx.lineTo(x * zoom + 0.5, h);
+        }
+        for (let y = 1; y < height; y++) {
+          ctx.moveTo(0, y * zoom + 0.5);
+          ctx.lineTo(w, y * zoom + 0.5);
+        }
+        ctx.stroke();
+      }
+
+      // brush cursor footprint
+      const hover = hoverRef.current;
+      if (hover && !strokeActiveRef.current && (tool === "pencil" || tool === "eraser") && brushSize > 1) {
+        ctx.strokeStyle = "rgba(255,255,255,0.5)";
+        ctx.lineWidth = 1;
+        const half = Math.floor(brushSize / 2);
+        ctx.strokeRect(
+          (hover.x - half) * zoom + 0.5,
+          (hover.y - half) * zoom + 0.5,
+          brushSize * zoom - 1,
+          brushSize * zoom - 1,
+        );
+      }
+
+      // stroke preview
+      if (strokeActiveRef.current && strokeRef.current.size > 0) {
+        const eraser = tool === "eraser";
+        for (const p of strokeRef.current.values()) {
+          const color = p.color ?? activeColor;
+          const rgba = hexToRgba(eraser ? "#ffffff" : color);
+          if (!rgba) continue;
+          if (eraser) {
+            ctx.fillStyle = "rgba(255,255,255,0.45)";
+            ctx.fillRect(p.x * zoom, p.y * zoom, zoom, zoom);
+            ctx.strokeStyle = "rgba(255,80,80,0.9)";
+            ctx.lineWidth = 1;
+            ctx.strokeRect(p.x * zoom + 0.5, p.y * zoom + 0.5, zoom - 1, zoom - 1);
+          } else {
+            ctx.fillStyle = `rgba(${rgba.r},${rgba.g},${rgba.b},${rgba.a})`;
+            ctx.fillRect(p.x * zoom, p.y * zoom, zoom, zoom);
+          }
         }
       }
-    }
 
-    // selection rect (live preview while dragging, or committed)
-    const rect = selectPreviewRef.current ?? selection;
-    if (rect) {
-      ctx.strokeStyle = "#38bdf8";
-      ctx.lineWidth = 1.5;
-      ctx.setLineDash([5, 4]);
-      ctx.strokeRect(rect.x * zoom + 0.5, rect.y * zoom + 0.5, rect.width * zoom - 1, rect.height * zoom - 1);
-      ctx.setLineDash([]);
-    }
+      // selection: marching ants
+      const rect = selectPreviewRef.current ?? selection;
+      if (rect) {
+        ctx.strokeStyle = "#000000";
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        ctx.lineDashOffset = -dashOffset;
+        ctx.strokeRect(rect.x * zoom + 0.5, rect.y * zoom + 0.5, rect.width * zoom - 1, rect.height * zoom - 1);
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineDashOffset = -dashOffset + 4;
+        ctx.strokeRect(rect.x * zoom + 0.5, rect.y * zoom + 0.5, rect.width * zoom - 1, rect.height * zoom - 1);
+        ctx.setLineDash([]);
+        ctx.lineDashOffset = 0;
+      }
 
-    // move preview: ghost outline shifted
-    if (moveOffsetRef.current && selection) {
-      const { dx, dy } = moveOffsetRef.current;
-      ctx.strokeStyle = "rgba(250,204,21,0.9)";
-      ctx.lineWidth = 1.5;
-      ctx.setLineDash([4, 3]);
-      ctx.strokeRect(
-        (selection.x + dx) * zoom + 0.5,
-        (selection.y + dy) * zoom + 0.5,
-        selection.width * zoom - 1,
-        selection.height * zoom - 1,
-      );
-      ctx.setLineDash([]);
-    }
+      // move preview: ghost outline shifted
+      if (moveOffsetRef.current && selection) {
+        const { dx, dy } = moveOffsetRef.current;
+        ctx.strokeStyle = "rgba(250,204,21,0.9)";
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([4, 3]);
+        ctx.strokeRect(
+          (selection.x + dx) * zoom + 0.5,
+          (selection.y + dy) * zoom + 0.5,
+          selection.width * zoom - 1,
+          selection.height * zoom - 1,
+        );
+        ctx.setLineDash([]);
+      }
 
-    // hover highlight
-    const hover = hoverRef.current;
-    if (hover && !strokeActiveRef.current) {
-      ctx.strokeStyle = "rgba(255,255,255,0.45)";
-      ctx.lineWidth = 1;
-      ctx.strokeRect(hover.x * zoom + 0.5, hover.y * zoom + 0.5, zoom - 1, zoom - 1);
-    }
-  }, [width, height, zoom, selection, tool, activeColor]);
+      // hover highlight (1px brush only)
+      if (hover && !strokeActiveRef.current && !(tool === "pencil" && brushSize > 1)) {
+        ctx.strokeStyle = "rgba(255,255,255,0.45)";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(hover.x * zoom + 0.5, hover.y * zoom + 0.5, zoom - 1, zoom - 1);
+      }
+    },
+    [width, height, zoom, selection, tool, activeColor, gridVisible, brushSize],
+  );
 
+  // redraw overlay on state changes
   useEffect(() => {
     drawOverlay();
-  }, [drawOverlay, frames, activeLayerId, activeFrameId]);
+  }, [drawOverlay, frames, activeLayerId, activeFrameId, onionSkin]);
+
+  // marching-ants animation loop (only while a selection exists)
+  useEffect(() => {
+    if (!selection && !selectPreviewRef.current) return;
+    let raf = 0;
+    let start = performance.now();
+    const tick = (t: number) => {
+      drawOverlay(Math.floor((t - start) / 50));
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [selection, drawOverlay]);
+
+  // space = pan modifier (Aseprite-style hand tool)
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.code === "Space") spaceDownRef.current = true;
+    };
+    const up = (e: KeyboardEvent) => {
+      if (e.code === "Space") spaceDownRef.current = false;
+    };
+    window.addEventListener("keydown", down);
+    window.addEventListener("keyup", up);
+    return () => {
+      window.removeEventListener("keydown", down);
+      window.removeEventListener("keyup", up);
+    };
+  }, []);
 
   const toPixel = useCallback(
     (e: React.PointerEvent | React.MouseEvent): { x: number; y: number } | null => {
@@ -169,18 +278,29 @@ export function Canvas() {
 
   const addStrokePixel = useCallback(
     (x: number, y: number) => {
-      const color = tool === "eraser" ? null : activeColor;
-      strokeRef.current.set(y * width + x, { x, y, color });
+      // right button paints with the secondary color; eraser always erases
+      const color = tool === "eraser" ? null : strokeButtonRef.current === 2 ? secondaryColor : activeColor;
+      for (const pt of brushBlock(x, y, brushSize, width, height)) {
+        strokeRef.current.set(pt.y * width + pt.x, { x: pt.x, y: pt.y, color });
+      }
     },
-    [tool, activeColor, width],
+    [tool, activeColor, secondaryColor, brushSize, width, height],
   );
 
   const onPointerDown = (e: React.PointerEvent) => {
-    const p = toPixel(e);
-    if (!p) return;
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
     const store = useEditorStore.getState();
+
+    // pan: space+drag or middle button
+    if (spaceDownRef.current || e.button === 1) {
+      panStartRef.current = { x: e.clientX, y: e.clientY, ox: pan.x, oy: pan.y };
+      return;
+    }
+
+    const p = toPixel(e);
+    if (!p) return;
     hoverRef.current = p;
+    strokeButtonRef.current = e.button;
 
     if (tool === "pencil" || tool === "eraser") {
       strokeRef.current.clear();
@@ -188,16 +308,17 @@ export function Canvas() {
       addStrokePixel(p.x, p.y);
       lastPointRef.current = p;
     } else if (tool === "fill") {
-      store.floodFill(p.x, p.y, store.activeColor);
+      store.floodFill(p.x, p.y, e.button === 2 ? store.secondaryColor : store.activeColor);
     } else if (tool === "picker") {
-      // sample composited pixel
       const canvas = mainRef.current;
       if (canvas) {
         const ctx = canvas.getContext("2d");
         const data = ctx?.getImageData(p.x, p.y, 1, 1).data;
         if (data && data[3] > 0) {
           const to = (v: number) => v.toString(16).padStart(2, "0");
-          store.setActiveColor(`#${to(data[0])}${to(data[1])}${to(data[2])}`);
+          const hex = `#${to(data[0])}${to(data[1])}${to(data[2])}`;
+          if (e.button === 2) store.setSecondaryColor(hex);
+          else store.setActiveColor(hex);
         }
       }
     } else if (tool === "select") {
@@ -216,6 +337,13 @@ export function Canvas() {
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
+    if (panStartRef.current) {
+      setPan({
+        x: panStartRef.current.ox + (e.clientX - panStartRef.current.x),
+        y: panStartRef.current.oy + (e.clientY - panStartRef.current.y),
+      });
+      return;
+    }
     const p = toPixel(e);
     if (!p) return;
     const changed = !hoverRef.current || hoverRef.current.x !== p.x || hoverRef.current.y !== p.y;
@@ -242,6 +370,7 @@ export function Canvas() {
   };
 
   const onPointerUp = () => {
+    panStartRef.current = null;
     const store = useEditorStore.getState();
     if (strokeActiveRef.current) {
       strokeActiveRef.current = false;
@@ -271,25 +400,28 @@ export function Canvas() {
     store.setZoom(store.zoom + (e.deltaY < 0 ? 2 : -2));
   };
 
-  const cursor =
-    tool === "picker" ? "crosshair" : tool === "move" ? "move" : "crosshair";
+  const panning = spaceDownRef.current;
+  const cursor = panning ? "grab" : tool === "picker" ? "crosshair" : tool === "move" ? "move" : "crosshair";
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden p-6">
         <div
           ref={containerRef}
-          className="relative shadow-[0_0_0_1px_rgba(0,0,0,0.6),0_0_0_2px_rgba(255,255,255,0.08)]"
+          className="relative shadow-[0_0_0_1px_rgba(0,0,0,0.55)]"
           style={{
             width: width * zoom,
             height: height * zoom,
             cursor,
             touchAction: "none",
-            background: `repeating-conic-gradient(#3a3a41 0% 25%, #303036 0% 50%) 50% / ${zoom * 2}px ${zoom * 2}px`,
+            transform: `translate(${pan.x}px, ${pan.y}px)`,
+            // Aseprite-style screen-space checkerboard: fixed size, light gray
+            background: "repeating-conic-gradient(#b9b9b9 0% 25%, #a6a6a6 0% 50%) 50% / 16px 16px",
           }}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
+          onContextMenu={(e) => e.preventDefault()}
           onPointerLeave={() => {
             hoverRef.current = null;
             setCoords(null);
@@ -297,6 +429,11 @@ export function Canvas() {
           }}
           onWheel={onWheel}
         >
+          <canvas
+            ref={underlayRef}
+            className="absolute inset-0 h-full w-full"
+            style={{ imageRendering: "pixelated", width: "100%", height: "100%" }}
+          />
           <canvas
             ref={mainRef}
             className="absolute inset-0 h-full w-full"
@@ -306,8 +443,13 @@ export function Canvas() {
         </div>
       </div>
       {/* Aseprite-style status bar */}
-      <div className="flex shrink-0 items-center gap-4 border-t border-edge bg-panel px-3 py-1 text-[11px] text-dim">
+      <div className="flex shrink-0 items-center gap-3 border-t border-edge bg-panel px-3 py-1 text-[11px] text-dim">
         <span className="font-mono text-ink">{coords ? `${coords.x}, ${coords.y}` : "—"}</span>
+        {selection && (
+          <span className="font-mono text-faint">
+            sel {selection.width}×{selection.height}
+          </span>
+        )}
         <div className="flex items-center gap-1">
           <button className="pf-btn px-1.5" onClick={() => useEditorStore.getState().setZoom(zoom - 2)}>
             −
@@ -317,12 +459,42 @@ export function Canvas() {
             +
           </button>
         </div>
-        <span className="ml-auto">
-          {width} × {height}
-        </span>
+        {/* brush size */}
+        <div className="flex items-center gap-0.5">
+          {[1, 2, 3, 4].map((s) => (
+            <button
+              key={s}
+              title={`Brush size ${s}`}
+              onClick={() => useEditorStore.getState().setBrushSize(s)}
+              className={`pf-btn h-5 w-5 p-0 ${brushSize === s ? "is-on" : ""}`}
+            >
+              <span className="block rounded-full bg-current" style={{ width: s * 2 + 2, height: s * 2 + 2 }} />
+            </button>
+          ))}
+        </div>
+        {/* view toggles */}
+        <button
+          title="Toggle pixel grid (')"
+          onClick={() => useEditorStore.getState().toggleGrid()}
+          className={`pf-btn ${gridVisible ? "is-on" : ""}`}
+        >
+          Grid
+        </button>
+        <button
+          title="Toggle onion skin (O)"
+          onClick={() => useEditorStore.getState().toggleOnionSkin()}
+          className={`pf-btn ${onionSkin ? "is-on" : ""}`}
+        >
+          Onion
+        </button>
+        <span className="ml-auto">Frame {frameIndex + 1}</span>
+        <span>/</span>
+        <span>{frames.length}</span>
         <span>·</span>
         <span className="capitalize">{tool}</span>
       </div>
     </div>
   );
 }
+
+type FrameNeighbor = -1 | 1;
