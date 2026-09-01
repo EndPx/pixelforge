@@ -1,32 +1,108 @@
-# React + TypeScript + Vite
+# PixelForge
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+> **An agent-native pixel art studio** — where humans and AI agents collaborate on the same canvas.
 
-Currently, two official plugins are available:
+PixelForge is a browser-based pixel-art editor built for the [WebMCP Challenge](https://webmcp.devpost.com/). It is not an "AI image generator": the AI agent **operates the editor itself** through [WebMCP](https://webmachinelearning.github.io/webmcp/) tools, using the exact same editor actions as the human. The agent draws pixels, manages layers and frames, recolors artwork, and exports sprite sheets — while every operation streams into a live activity panel and every one of them is undoable.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+**Live app:** https://endpx.github.io/pixelforge/
 
-## React Compiler
+## Why WebMCP
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Traditional "AI image" workflows are one-shot: prompt → PNG → import → manual fixing. PixelForge exposes a **structured creative interface** via `document.modelContext.registerTool()`, so an agent can:
 
-## Expanding the Oxlint configuration
+- **inspect** the real editor state and read actual pixel regions before acting,
+- **edit contextually** ("make the eyes smaller and move them down one pixel") instead of regenerating,
+- **compose primitives** (create layer → draw → select region → move → flip) into multi-step workflows,
+- **animate** by creating and modifying timeline frames,
+- **recolor** the whole animation in one call,
+- **export** a production sprite sheet.
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+The agent shares the canvas with the human — the same state, the same undo history, visible on the same screen.
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+## Human + Agent workflow
+
+```text
+Human intent
+      ↓
+AI Agent (ChatGPT in-app browser / any WebMCP client)
+      ↓
+WebMCP tools (document.modelContext)
+      ↓
+Editor Actions  ←── Human UI (mouse / keyboard)
+      ↓
+Editor State
+      ↓
+Canvas · Layers · Timeline
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Both surfaces converge on **one action layer**. There is no separate "AI drawing implementation" — WebMCP tools call the same store actions the human UI calls.
+
+## Features
+
+**Human editor** — pencil / eraser / flood fill / color picker / rect select / move, layers (add, reorder, rename, hide, opacity), animation timeline with playback and frame durations, palette + custom colors, zoom, undo/redo, keyboard shortcuts, PNG + sprite-sheet export, localStorage save/load.
+
+**Agent surface** — 17 WebMCP tools (below), a live **Agent Activity** panel showing every tool call with actor badges, structured success/error results, batched pixel operations, and full undoability of agent edits.
+
+## WebMCP tools
+
+| Category | Tool | Description |
+|---|---|---|
+| Read | `get_editor_state` | Canvas size, frames, layers, palette, selection |
+| Read | `get_region` | Compact legend + grid of a region's pixels |
+| Create | `draw_pixels` | Batch-draw many pixels in one call |
+| Create | `erase_pixels` | Batch-erase pixels |
+| Create | `fill_region` | Flood fill from a coordinate |
+| Create | `create_layer` / `create_frame` | New layer / timeline frame |
+| Modify | `replace_color` | Recolor artwork (layer / all-layers / **all-frames**) — idempotent |
+| Modify | `move_region` / `flip_region` / `clear_region` | Transform the current selection |
+| Organize | `select_layer` / `select_frame` / `select_region` / `set_layer_visibility` / `duplicate_frame` | Aim and organize before mutating |
+| Export | `export_sprite_sheet` | Download all frames as a sprite sheet, returns metadata + data URL |
+
+Every tool returns structured JSON — `{ success, operation, detail, ... }` or `{ success: false, error: { code, message } }` — so the agent can reason about failures instead of guessing.
+
+## Architecture
+
+```text
+src/
+├── editor/
+│   ├── store.ts        # Zustand store: shared actions + snapshot undo/redo + activity log
+│   ├── colors.ts       # Hex helpers + flood fill
+│   ├── render.ts       # Layer compositing → ImageData
+│   ├── export.ts       # PNG + sprite sheet
+│   └── serialize.ts    # Project save/load (localStorage)
+├── webmcp/
+│   ├── tools.ts        # 17 tool definitions (name/description/schema/execute)
+│   ├── registerTools.ts# document.modelContext registration + debug bridge
+│   └── modelContext.ts # WebMCP API type declarations
+├── components/
+│   ├── editor/         # Canvas, Toolbar, Palette, LayersPanel, Timeline, Header
+│   └── agent/          # AgentPanel (live tool-call log)
+└── types.ts
+```
+
+Human UI and WebMCP tools both call `useEditorStore` actions (`drawPixels`, `floodFill`, `createFrame`, …). Each mutation pushes a snapshot for undo and an entry into the activity log tagged with its **actor** (`human` or `agent`).
+
+## Running it
+
+```bash
+npm install
+npm run dev        # http://localhost:5173
+npm test           # 36 unit tests
+npm run build      # production build to dist/
+```
+
+### Testing the agent experience
+
+1. **ChatGPT desktop app** — open the live URL in ChatGPT's in-app browser (Site tools appears in the address bar) and prompt: *"Create a cute green slime character, then turn it into a 4-frame idle animation."*
+2. **Chrome** — enable `chrome://flags/#enable-webmcp-testing`, relaunch, open the page, and use the Model Context Tool Inspector extension to browse and invoke tools.
+3. **Any browser (manual QA)** — the page installs an honest debug bridge (it is *not* WebMCP):
+   ```js
+   __pixelforge.listTools()
+   await __pixelforge.call("draw_pixels", { pixels: [{ x: 5, y: 5, color: "#38b764" }] })
+   ```
+
+When the WebMCP API is absent, the header badge shows **"WebMCP inactive"** — registration is never faked.
+
+## License
+
+[MIT](./LICENSE)
