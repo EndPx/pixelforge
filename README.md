@@ -94,14 +94,20 @@ npm run build      # production build to dist/
 ### Testing the agent experience
 
 1. **ChatGPT desktop app** — open the live URL in ChatGPT's in-app browser (Site tools appears in the address bar) and prompt: *"Create a cute green slime character, then turn it into a 4-frame idle animation."*
-2. **Chrome** — enable `chrome://flags/#enable-webmcp-testing`, relaunch, open the page, and use the Model Context Tool Inspector extension to browse and invoke tools.
+2. **Chrome with the WebMCP flag** (Chrome 149+):
+   1. Open `chrome://flags/#enable-webmcp-testing` in the address bar
+   2. Switch the dropdown from **Default** to **Enabled**
+   3. Click **Relaunch** (bottom-right)
+   4. Open https://endpx.github.io/pixelforge/ — the header badge flips to **"WebMCP live · 17 tools"**
+   5. Optionally install the **Model Context Tool Inspector** extension from the Chrome Web Store to browse the registered tools, invoke them manually, and inspect the structured JSON results — it imitates how an agent sees the page
+   6. If the flag is missing, update Chrome via `chrome://settings/help`; after a major Chrome update the flag may reset to Default (just re-enable it)
 3. **Any browser (manual QA)** — the page installs an honest debug bridge (it is *not* WebMCP):
    ```js
    __pixelforge.listTools()
    await __pixelforge.call("draw_pixels", { pixels: [{ x: 5, y: 5, color: "#38b764" }] })
    ```
 
-When the WebMCP API is absent, the header badge shows **"WebMCP inactive"** — registration is never faked.
+Until the flag is enabled (or inside ChatGPT's browser), the header badge shows **"WebMCP inactive"** — that is correct behavior, and registration is never faked.
 
 ## License
 
