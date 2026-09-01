@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useEditorStore, getActiveFrame } from "../../editor/store";
 import { renderFrameToImageData } from "../../editor/render";
 import type { PixelInput, Rect } from "../../types";
@@ -55,6 +55,7 @@ export function Canvas() {
   const moveStartRef = useRef<{ x: number; y: number } | null>(null);
   const moveOffsetRef = useRef<{ dx: number; dy: number } | null>(null);
   const hoverRef = useRef<{ x: number; y: number } | null>(null);
+  const [coords, setCoords] = useState<{ x: number; y: number } | null>(null);
 
   const frame = getActiveFrame({ frames, activeFrameId });
 
@@ -206,7 +207,7 @@ export function Canvas() {
       if (!store.selection) {
         selectStartRef.current = p;
         selectPreviewRef.current = { x: p.x, y: p.y, width: 1, height: 1 };
-        tool === "move" && store.setTool("select");
+        store.setTool("select");
       } else {
         moveStartRef.current = p;
       }
@@ -219,6 +220,7 @@ export function Canvas() {
     if (!p) return;
     const changed = !hoverRef.current || hoverRef.current.x !== p.x || hoverRef.current.y !== p.y;
     hoverRef.current = p;
+    if (changed) setCoords(p);
 
     if (strokeActiveRef.current && lastPointRef.current) {
       const line = bresenham(lastPointRef.current.x, lastPointRef.current.y, p.x, p.y);
@@ -291,6 +293,7 @@ export function Canvas() {
           onPointerUp={onPointerUp}
           onPointerLeave={() => {
             hoverRef.current = null;
+            setCoords(null);
             drawOverlay();
           }}
           onWheel={onWheel}
@@ -305,9 +308,7 @@ export function Canvas() {
       </div>
       {/* Aseprite-style status bar */}
       <div className="flex shrink-0 items-center gap-4 border-t border-edge bg-panel px-3 py-1 text-[11px] text-dim">
-        <span className="font-mono text-ink">
-          {hoverRef.current ? `${hoverRef.current.x}, ${hoverRef.current.y}` : "—"}
-        </span>
+        <span className="font-mono text-ink">{coords ? `${coords.x}, ${coords.y}` : "—"}</span>
         <div className="flex items-center gap-1">
           <button className="pf-btn px-1.5" onClick={() => useEditorStore.getState().setZoom(zoom - 2)}>
             −
