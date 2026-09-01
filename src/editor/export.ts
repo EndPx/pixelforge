@@ -1,3 +1,4 @@
+import { GIFEncoder, quantize, applyPalette } from "gifenc";
 import type { Frame } from "../types";
 import { renderFrameToImageData } from "./render";
 
@@ -30,6 +31,50 @@ function download(canvas: HTMLCanvasElement, filename: string): void {
 /** Export the active frame as a PNG download. */
 export function exportCurrentFrame(width: number, height: number, frame: Frame, scale = 8): void {
   download(scaledCopy(frameToCanvas(frame, width, height), scale), `pixelforge-frame-${Date.now()}.png`);
+}
+
+export interface GifResult {
+  frameCount: number;
+  width: number;
+  height: number;
+  sizeBytes: number;
+}
+
+/**
+ * Export all frames as an animated GIF (LibreSprite-style animation export).
+ * Frames are flattened onto white since classic GIF palettes are opaque.
+ */
+export function exportGif(
+  width: number,
+  height: number,
+  frames: Frame[],
+  scale = 4,
+  background = "#ffffff",
+): GifResult {
+  const gif = GIFEncoder();
+  const out = document.createElement("canvas");
+  out.width = width * scale;
+  out.height = height * scale;
+  const octx = out.getContext("2d")!;
+  for (const frame of frames) {
+    octx.fillStyle = background;
+    octx.fillRect(0, 0, out.width, out.height);
+    octx.imageSmoothingEnabled = false;
+    octx.drawImage(frameToCanvas(frame, width, height), 0, 0, out.width, out.height);
+    const { data } = octx.getImageData(0, 0, out.width, out.height);
+    const palette = quantize(data, 256, { format: "rgb565" });
+    const index = applyPalette(data, palette, "rgb565");
+    gif.writeFrame(index, out.width, out.height, { palette, delay: Math.max(20, frame.duration) });
+  }
+  gif.finish();
+  const blob = new Blob([gif.bytesView() as BlobPart], { type: "image/gif" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.download = `pixelforge-animation-${frames.length}f-${Date.now()}.gif`;
+  link.href = url;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  return { frameCount: frames.length, width: out.width, height: out.height, sizeBytes: blob.size };
 }
 
 export interface SpriteSheetResult {

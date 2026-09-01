@@ -1,5 +1,5 @@
 import { useEditorStore, getActiveFrame, getActiveLayer } from "../editor/store";
-import { exportSpriteSheet } from "../editor/export";
+import { exportSpriteSheet, exportGif } from "../editor/export";
 import type { WebMCPToolDefinition } from "./modelContext";
 import { normalizeHex } from "../editor/colors";
 import type { Actor, Rect } from "../types";
@@ -626,6 +626,44 @@ export const TOOL_DEFS: WebMCPToolDefinition[] = [
         });
       } catch (e) {
         return fail("export_sprite_sheet", "EXPORT_FAILED", String(e));
+      }
+    },
+  },
+
+  {
+    name: "export_animation_gif",
+    description:
+      "Export the whole animation as an animated GIF file and trigger a browser download. Frames play at their configured durations. Returns file metadata.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        scale: { type: "integer", description: "Output scale factor per pixel (default 4)" },
+        background: { type: "string", description: "Hex background color the animation is flattened onto (default '#ffffff')" },
+      },
+    },
+    execute: async (input) => {
+      const s = useEditorStore.getState();
+      const scale = input.scale === undefined ? 4 : Math.max(1, Math.min(16, int(input.scale)));
+      const background = str(input.background) || "#ffffff";
+      if (!normalizeHex(background)) {
+        return fail("export_animation_gif", "INVALID_COLOR", `Invalid background color: ${background}`);
+      }
+      try {
+        const result = exportGif(s.width, s.height, s.frames, scale, background);
+        s.logActivity({
+          actor: AGENT,
+          action: "export_animation_gif",
+          description: `Exported animated GIF (${result.frameCount} frames, ${result.sizeBytes} bytes)`,
+          ok: true,
+        });
+        return ok("export_animation_gif", "Animated GIF generated and download started", {
+          frameCount: result.frameCount,
+          width: result.width,
+          height: result.height,
+          sizeBytes: result.sizeBytes,
+        });
+      } catch (e) {
+        return fail("export_animation_gif", "EXPORT_FAILED", String(e));
       }
     },
   },

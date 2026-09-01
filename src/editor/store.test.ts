@@ -217,6 +217,20 @@ describe("editor store: history", () => {
   });
 });
 
+describe("editor store: tiled mode", () => {
+  it("wraps out-of-bounds pixels around canvas edges when enabled", () => {
+    const store = makeStore();
+    store.getState().toggleTiledMode();
+    store.getState().drawPixels([{ x: 9, y: 2, color: "#ffffff" }, { x: -1, y: 0, color: "#00ff00" }]);
+    const px = layerPixels(store);
+    expect(px[2 * 8 + 1]).toBe("#ffffff"); // x=9 wrapped to x=1
+    expect(px[0 * 8 + 7]).toBe("#00ff00"); // x=-1 wrapped to x=7
+    store.getState().toggleTiledMode();
+    store.getState().drawPixels([{ x: 9, y: 5, color: "#ff0000" }]);
+    expect(store.getState().activity.at(-1)!.ok).toBe(false); // rejected when off
+  });
+});
+
 describe("editor store: palette", () => {
   it("sets a new palette and ignores invalid colors", () => {
     const store = makeStore();

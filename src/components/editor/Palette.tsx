@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useEditorStore } from "../../editor/store";
 import { normalizeHex } from "../../editor/colors";
+import { PALETTE_PRESETS } from "../../types";
 
 export function Palette() {
   const palette = useEditorStore((s) => s.palette);
@@ -60,6 +61,28 @@ export function Palette() {
             {secondaryColor}
           </div>
         </div>
+      </div>
+
+      <div className="flex items-center gap-1">
+        <select
+          title="Load a ready-made palette"
+          defaultValue=""
+          onChange={(e) => {
+            const preset = PALETTE_PRESETS[e.target.value];
+            if (preset) useEditorStore.getState().setPalette(preset);
+            e.target.selectedIndex = 0;
+          }}
+          className="min-w-0 flex-1 border border-edge2 bg-app px-1 py-0.5 text-[11px] text-ink focus:border-accent focus:outline-none"
+        >
+          <option value="" disabled>
+            Palettes…
+          </option>
+          {Object.keys(PALETTE_PRESETS).map((name) => (
+            <option key={name} value={name}>
+              {name}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div>

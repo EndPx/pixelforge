@@ -134,6 +134,12 @@ describe("webmcp tool execution", () => {
     expect(result.legend).toEqual(["transparent", "#123456"]);
   });
 
+  it("export_animation_gif validates arguments (canvas rendering verified in-browser)", async () => {
+    const bad = await call("export_animation_gif", { background: "bogus" });
+    expect(bad.success).toBe(false);
+    expect((bad.error as { code: string }).code).toBe("INVALID_COLOR");
+  });
+
   it("agent mutations are undoable", async () => {
     await call("draw_pixels", { pixels: [{ x: 3, y: 3, color: "#ff0000" }] });
     useEditorStore.getState().undo();

@@ -61,6 +61,7 @@ export function Canvas() {
   const brushSize = useEditorStore((s) => s.brushSize);
   const gridVisible = useEditorStore((s) => s.gridVisible);
   const onionSkin = useEditorStore((s) => s.onionSkin);
+  const tiledMode = useEditorStore((s) => s.tiledMode);
 
   const mainRef = useRef<HTMLCanvasElement>(null);
   const underlayRef = useRef<HTMLCanvasElement>(null);
@@ -486,6 +487,13 @@ export function Canvas() {
           className={`pf-btn ${onionSkin ? "is-on" : ""}`}
         >
           Onion
+        </button>
+        <button
+          title="Tiled mode — drawing wraps around the canvas edges"
+          onClick={() => useEditorStore.getState().toggleTiledMode()}
+          className={`pf-btn ${tiledMode ? "is-on" : ""}`}
+        >
+          Tile
         </button>
         <span className="ml-auto">Frame {frameIndex + 1}</span>
         <span>/</span>

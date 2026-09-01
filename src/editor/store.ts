@@ -25,6 +25,7 @@ export interface EditorState {
   brushSize: number;
   gridVisible: boolean;
   onionSkin: boolean;
+  tiledMode: boolean;
   tool: ToolId;
   selection: Rect | null;
   zoom: number;
@@ -71,6 +72,7 @@ export interface EditorState {
   setBrushSize: (size: number) => void;
   toggleGrid: () => void;
   toggleOnionSkin: () => void;
+  toggleTiledMode: () => void;
   setZoom: (zoom: number) => void;
   setWebmcpAvailable: (available: boolean) => void;
   logActivity: (entry: Omit<ActivityEntry, "id" | "timestamp">) => void;
@@ -198,6 +200,7 @@ export function createEditorStore(width = 32, height = 32) {
       brushSize: 1,
       gridVisible: false,
       onionSkin: false,
+      tiledMode: false,
       tool: "pencil",
       selection: null,
       zoom: 16,
@@ -214,7 +217,11 @@ export function createEditorStore(width = 32, height = 32) {
         let frame = s.frames.find((f) => f.id === (opts.frameId ?? s.activeFrameId));
         if (!frame) return logError(meta, "FRAME_NOT_FOUND", `Frame not found`);
         const layer = frame.layers.find((l) => l.id === (opts.layerId ?? s.activeLayerId)) ?? frame.layers[frame.layers.length - 1];
-        const valid = pixels.filter((p) => Number.isInteger(p.x) && Number.isInteger(p.y) && p.x >= 0 && p.x < w && p.y >= 0 && p.y < h);
+        const wrap = (v: number, max: number) => ((v % max) + max) % max;
+        const normalized = s.tiledMode
+          ? pixels.map((p) => ({ ...p, x: wrap(Math.floor(p.x), w), y: wrap(Math.floor(p.y), h) }))
+          : pixels;
+        const valid = normalized.filter((p) => Number.isInteger(p.x) && Number.isInteger(p.y) && p.x >= 0 && p.x < w && p.y >= 0 && p.y < h);
         if (valid.length === 0) {
           return logError(meta, "INVALID_COORDINATE", `All ${pixels.length} pixel(s) are outside the ${w}x${h} canvas.`);
         }
@@ -682,6 +689,7 @@ export function createEditorStore(width = 32, height = 32) {
         setState((s) => ({ ...s, brushSize: Math.max(1, Math.min(8, Math.round(size))) })),
       toggleGrid: () => setState((s) => ({ ...s, gridVisible: !s.gridVisible })),
       toggleOnionSkin: () => setState((s) => ({ ...s, onionSkin: !s.onionSkin })),
+      toggleTiledMode: () => setState((s) => ({ ...s, tiledMode: !s.tiledMode })),
       setZoom: (zoom) => setState((s) => ({ ...s, zoom: Math.max(2, Math.min(40, zoom)) })),
       setWebmcpAvailable: (available) => setState((s) => ({ ...s, webmcpAvailable: available })),
       logActivity: (entry) =>

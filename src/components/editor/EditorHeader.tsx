@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useEditorStore, getActiveFrame } from "../../editor/store";
-import { exportCurrentFrame, exportSpriteSheet } from "../../editor/export";
+import { exportCurrentFrame, exportSpriteSheet, exportGif } from "../../editor/export";
 import { CANVAS_PRESETS } from "../../types";
 import { TOOL_DEFS } from "../../webmcp/tools";
 import { saveProject, loadProject } from "../../editor/serialize";
@@ -84,6 +84,20 @@ export function EditorHeader() {
 
       <button onClick={() => exportCurrentFrame(width, height, frame)} className="pf-btn text-[11px]">
         PNG
+      </button>
+      <button
+        onClick={() => {
+          const result = exportGif(width, height, frames, 4);
+          store.getState().logActivity({
+            actor: "human" as const,
+            action: "export_animation_gif",
+            description: `Exported animated GIF (${result.frameCount} frames)`,
+            ok: true,
+          });
+        }}
+        className="pf-btn text-[11px]"
+      >
+        GIF
       </button>
       <button
         onClick={() => {
