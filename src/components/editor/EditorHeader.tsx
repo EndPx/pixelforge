@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useEditorStore, getActiveFrame } from "../../editor/store";
 import { exportCurrentFrame, exportSpriteSheet } from "../../editor/export";
 import { CANVAS_PRESETS } from "../../types";
+import { TOOL_DEFS } from "../../webmcp/tools";
 import { saveProject, loadProject } from "../../editor/serialize";
 
 function WebMCPBadge() {
@@ -18,7 +19,7 @@ function WebMCPBadge() {
       }`}
     >
       <span className={`h-1.5 w-1.5 rounded-full ${available ? "animate-pulse bg-emerald-400" : "bg-faint"}`} />
-      WebMCP {available ? "live · 17 tools" : "inactive"}
+      WebMCP {available ? `live · ${TOOL_DEFS.length} tools` : "inactive"}
     </span>
   );
 }

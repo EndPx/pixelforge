@@ -41,7 +41,7 @@ Both surfaces converge on **one action layer**. There is no separate "AI drawing
 
 **Human editor** — pencil / eraser / flood fill / color picker / rect select / move, layers (add, reorder, rename, hide, opacity), animation timeline with playback and frame durations, palette + custom colors, zoom, undo/redo, keyboard shortcuts, PNG + sprite-sheet export, localStorage save/load.
 
-**Agent surface** — 17 WebMCP tools (below), a live **Agent Activity** panel showing every tool call with actor badges, structured success/error results, batched pixel operations, and full undoability of agent edits.
+**Agent surface** — 18 WebMCP tools (below), a live **Agent Activity** panel showing every tool call with actor badges, structured success/error results, batched pixel operations, and full undoability of agent edits.
 
 ## WebMCP tools
 
@@ -71,7 +71,7 @@ src/
 │   ├── export.ts       # PNG + sprite sheet
 │   └── serialize.ts    # Project save/load (localStorage)
 ├── webmcp/
-│   ├── tools.ts        # 17 tool definitions (name/description/schema/execute)
+│   ├── tools.ts        # 18 tool definitions (name/description/schema/execute)
 │   ├── registerTools.ts# document.modelContext registration + debug bridge
 │   └── modelContext.ts # WebMCP API type declarations
 ├── components/
@@ -98,7 +98,7 @@ npm run build      # production build to dist/
    1. Open `chrome://flags/#enable-webmcp-testing` in the address bar
    2. Switch the dropdown from **Default** to **Enabled**
    3. Click **Relaunch** (bottom-right)
-   4. Open https://endpx.github.io/pixelforge/ — the header badge flips to **"WebMCP live · 17 tools"**
+   4. Open https://endpx.github.io/pixelforge/ — the header badge flips to **"WebMCP live · 18 tools"**
    5. Optionally install the **Model Context Tool Inspector** extension from the Chrome Web Store to browse the registered tools, invoke them manually, and inspect the structured JSON results — it imitates how an agent sees the page
    6. If the flag is missing, update Chrome via `chrome://settings/help`; after a major Chrome update the flag may reset to Default (just re-enable it)
 3. **Any browser (manual QA)** — the page installs an honest debug bridge (it is *not* WebMCP):

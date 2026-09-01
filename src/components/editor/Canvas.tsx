@@ -285,8 +285,7 @@ export function Canvas() {
             height: height * zoom,
             cursor,
             touchAction: "none",
-            background:
-              "repeating-conic-gradient(#3a3a41 0% 25%, #303036 0% 50%) 50% / 16px 16px",
+            background: `repeating-conic-gradient(#3a3a41 0% 25%, #303036 0% 50%) 50% / ${zoom * 2}px ${zoom * 2}px`,
           }}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
