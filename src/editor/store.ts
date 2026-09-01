@@ -21,6 +21,10 @@ export interface EditorState {
   activeLayerId: string;
   palette: string[];
   activeColor: string;
+  secondaryColor: string;
+  brushSize: number;
+  gridVisible: boolean;
+  onionSkin: boolean;
   tool: ToolId;
   selection: Rect | null;
   zoom: number;
@@ -62,6 +66,11 @@ export interface EditorState {
   // ui
   setTool: (tool: ToolId) => void;
   setActiveColor: (color: string) => void;
+  setSecondaryColor: (color: string) => void;
+  swapColors: () => void;
+  setBrushSize: (size: number) => void;
+  toggleGrid: () => void;
+  toggleOnionSkin: () => void;
   setZoom: (zoom: number) => void;
   setWebmcpAvailable: (available: boolean) => void;
   logActivity: (entry: Omit<ActivityEntry, "id" | "timestamp">) => void;
@@ -94,16 +103,12 @@ function snapshotOf(s: EditorState): EditorSnapshot {
 }
 
 function activeFrame(s: Pick<EditorState, "frames" | "activeFrameId">): Frame {
-  const f = s.frames.find((fr) => fr.id === s.activeFrameId);
-  if (!f) throw new Error("No active frame");
-  return f;
+  return s.frames.find((fr) => fr.id === s.activeFrameId) ?? s.frames[0];
 }
 
 function activeLayer(s: Pick<EditorState, "frames" | "activeFrameId" | "activeLayerId">): Layer {
   const f = activeFrame(s);
-  const l = f.layers.find((la) => la.id === s.activeLayerId);
-  if (!l) throw new Error("No active layer");
-  return l;
+  return f.layers.find((la) => la.id === s.activeLayerId) ?? f.layers[f.layers.length - 1];
 }
 
 export function getActiveFrame(s: Pick<EditorState, "frames" | "activeFrameId">): Frame {
@@ -189,6 +194,10 @@ export function createEditorStore(width = 32, height = 32) {
       activeLayerId: frames[0].layers[frames[0].layers.length - 1].id,
       palette: [...STARTER_PALETTE],
       activeColor: STARTER_PALETTE[10],
+      secondaryColor: STARTER_PALETTE[12],
+      brushSize: 1,
+      gridVisible: false,
+      onionSkin: false,
       tool: "pencil",
       selection: null,
       zoom: 16,
@@ -338,30 +347,44 @@ export function createEditorStore(width = 32, height = 32) {
       },
 
       renameLayer: (layerId, name) => {
+        const s = get();
+        const current = activeFrame(s).layers.find((l) => l.id === layerId) ?? activeLayer(s);
         const meta: CommitMeta = { action: "rename_layer", description: `Renamed layer to "${name}"` };
         commit(meta, (draft) => {
+          // Aseprite semantics: a layer exists across every frame — rename it everywhere.
           for (const f of draft.frames) {
-            const la = f.layers.find((l) => l.id === layerId);
+            const la = f.layers.find((l) => l.name === current.name);
             if (la) la.name = name;
           }
         });
       },
 
       toggleLayerVisibility: (layerId) => {
-        const meta: CommitMeta = { action: "toggle_layer_visibility", description: "Toggled layer visibility" };
+        const s = get();
+        const frame = activeFrame(s);
+        const target = frame.layers.find((l) => l.id === layerId);
+        if (!target) throw new Error(`LAYER_NOT_FOUND: ${layerId}`);
+        const meta: CommitMeta = {
+          action: "toggle_layer_visibility",
+          description: `${target.visible ? "Hid" : "Showed"} layer "${target.name}"`,
+        };
         commit(meta, (draft) => {
+          // Aseprite semantics: visibility belongs to the layer, shared by all frames.
           for (const f of draft.frames) {
-            const la = f.layers.find((l) => l.id === layerId);
+            const la = f.layers.find((l) => l.name === target.name);
             if (la) la.visible = !la.visible;
           }
         });
       },
 
       setLayerOpacity: (layerId, opacity) => {
+        const s = get();
+        const frame = activeFrame(s);
+        const target = frame.layers.find((l) => l.id === layerId);
         const meta: CommitMeta = { action: "set_layer_opacity", description: `Layer opacity: ${Math.round(opacity * 100)}%` };
         commit(meta, (draft) => {
           for (const f of draft.frames) {
-            const la = f.layers.find((l) => l.id === layerId);
+            const la = f.layers.find((l) => l.name === (target?.name ?? ""));
             if (la) la.opacity = Math.max(0, Math.min(1, opacity));
           }
         });
@@ -381,17 +404,16 @@ export function createEditorStore(width = 32, height = 32) {
       createFrame: (opts = {}) => {
         const meta: CommitMeta = { actor: opts.actor, action: "create_frame", description: "" };
         const s = get();
-        const empty = makeFrame(s.frames[0].layers.map((l) => makeLayer(l.name, s.width * s.height)));
+        const source = activeFrame(s);
+        const empty = makeFrame(source.layers.map((l) => makeLayer(l.name, s.width * s.height)));
+        const activeLayerName = activeLayer(s).name;
         meta.description = `Created frame ${s.frames.length + 1}`;
         commit(meta, (draft) => {
           draft.frames.push(empty);
           draft.activeFrameId = empty.id;
           const created = draft.frames.find((f) => f.id === empty.id)!;
-          const prevActiveLayerName = draft.frames[0].layers.find((l) => l.id === draft.activeLayerId)?.name;
-          if (prevActiveLayerName) {
-            const match = created.layers.find((l) => l.name === prevActiveLayerName);
-            if (match) draft.activeLayerId = match.id;
-          }
+          const match = created.layers.find((l) => l.name === activeLayerName);
+          draft.activeLayerId = match ? match.id : created.layers[created.layers.length - 1].id;
         });
         return empty.id;
       },
@@ -650,6 +672,16 @@ export function createEditorStore(width = 32, height = 32) {
         const norm = normalizeHex(color);
         if (norm) setState((s) => ({ ...s, activeColor: norm }));
       },
+      setSecondaryColor: (color) => {
+        const norm = normalizeHex(color);
+        if (norm) setState((s) => ({ ...s, secondaryColor: norm }));
+      },
+      swapColors: () =>
+        setState((s) => ({ ...s, activeColor: s.secondaryColor, secondaryColor: s.activeColor })),
+      setBrushSize: (size) =>
+        setState((s) => ({ ...s, brushSize: Math.max(1, Math.min(8, Math.round(size))) })),
+      toggleGrid: () => setState((s) => ({ ...s, gridVisible: !s.gridVisible })),
+      toggleOnionSkin: () => setState((s) => ({ ...s, onionSkin: !s.onionSkin })),
       setZoom: (zoom) => setState((s) => ({ ...s, zoom: Math.max(2, Math.min(40, zoom)) })),
       setWebmcpAvailable: (available) => setState((s) => ({ ...s, webmcpAvailable: available })),
       logActivity: (entry) =>
