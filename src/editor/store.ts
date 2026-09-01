@@ -146,29 +146,33 @@ export function createEditorStore(width = 32, height = 32) {
   return create<EditorState>()((setState, get) => {
     /** Snapshot-based mutation commit: pushes undo entry, applies mutation, logs activity. */
     function commit(meta: CommitMeta, mutate: (draft: EditorSnapshot, s: EditorState) => void) {
-      setState((s) => {
-        const before = snapshotOf(s);
-        const draft = structuredClone(before);
-        try {
-          mutate(draft, s);
-        } catch (err) {
-          s.logActivity({ actor: meta.actor ?? "human", action: meta.action, description: String(err), ok: false });
-          return s;
+      const s = get();
+      const before = snapshotOf(s);
+      const draft = structuredClone(before);
+      let errorText: string | null = null;
+      try {
+        mutate(draft, s);
+      } catch (err) {
+        errorText = String(err);
+      }
+      const entry: ActivityEntry = {
+        id: uid("act"),
+        timestamp: Date.now(),
+        actor: meta.actor ?? "human",
+        action: meta.action,
+        description: errorText ?? meta.description,
+        ok: errorText === null,
+      };
+      setState((st) => {
+        if (errorText !== null) {
+          return { ...st, activity: [...st.activity, entry].slice(-MAX_ACTIVITY) };
         }
-        const entry: ActivityEntry = {
-          id: uid("act"),
-          timestamp: Date.now(),
-          actor: meta.actor ?? "human",
-          action: meta.action,
-          description: meta.description,
-          ok: true,
-        };
         return {
-          ...s,
+          ...st,
           ...draft,
-          past: [...s.past, before].slice(-MAX_HISTORY),
+          past: [...st.past, before].slice(-MAX_HISTORY),
           future: [],
-          activity: [...s.activity, entry].slice(-MAX_ACTIVITY),
+          activity: [...st.activity, entry].slice(-MAX_ACTIVITY),
         };
       });
     }
@@ -254,6 +258,14 @@ export function createEditorStore(width = 32, height = 32) {
         if (!toN) return logError(meta, "INVALID_COLOR", `Invalid target color: ${to}`);
         const targetFrames = opts.allFrames ? s.frames : s.frames.filter((f) => f.id === (opts.frameId ?? s.activeFrameId));
         let count = 0;
+        for (const f of targetFrames) {
+          for (const la of f.layers) {
+            if (!opts.allLayers && opts.layerId !== undefined && la.id !== opts.layerId) continue;
+            if (!opts.allLayers && opts.layerId === undefined && la.id !== s.activeLayerId) continue;
+            for (const px of la.pixels) if (px === fromN) count++;
+          }
+        }
+        meta.description = `Replaced ${fromN} → ${toN} on ${count} pixel(s)`;
         commit(meta, (draft) => {
           for (const f of draft.frames) {
             if (!targetFrames.some((tf) => tf.id === f.id)) continue;
@@ -263,7 +275,6 @@ export function createEditorStore(width = 32, height = 32) {
               for (let i = 0; i < la.pixels.length; i++) {
                 if (la.pixels[i] === fromN) {
                   la.pixels[i] = toN;
-                  count++;
                 }
               }
             }
@@ -442,9 +453,15 @@ export function createEditorStore(width = 32, height = 32) {
           }));
         }
         setState((st) => {
-          const frame = st.frames.find((f) => f.id === frameId)!;
-          const layerByName = frame.layers.find((l) => l.name === frame.layers.find((x) => x.id === st.activeLayerId)?.name);
-          return { ...st, activeFrameId: frameId, activeLayerId: layerByName?.id ?? st.activeLayerId };
+          const oldFrame = st.frames.find((f) => f.id === st.activeFrameId);
+          const currentName = oldFrame?.layers.find((l) => l.id === st.activeLayerId)?.name;
+          const newFrame = st.frames.find((f) => f.id === frameId)!;
+          const match = currentName ? newFrame.layers.find((l) => l.name === currentName) : undefined;
+          return {
+            ...st,
+            activeFrameId: frameId,
+            activeLayerId: match?.id ?? newFrame.layers[newFrame.layers.length - 1].id,
+          };
         });
       },
 

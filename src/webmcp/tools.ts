@@ -79,6 +79,10 @@ function errCode(detail: string): string {
   return "OPERATION_FAILED";
 }
 
+function cleanDetail(detail: string): string {
+  return detail.replace(/^[A-Z_]+: /, "");
+}
+
 /** Resolve a layer reference (id or case-insensitive name) to its id, or null. */
 function resolveLayer(ref: unknown): string | undefined | null {
   if (ref === undefined || ref === null || ref === "") return undefined; // active layer
@@ -248,7 +252,7 @@ export const TOOL_DEFS: WebMCPToolDefinition[] = [
       );
       return outcome.ok
         ? ok("draw_pixels", outcome.detail, { affectedPixels: pixels.length })
-        : fail("draw_pixels", errCode(outcome.detail), outcome.detail);
+        : fail("draw_pixels", errCode(outcome.detail), cleanDetail(outcome.detail));
     },
   },
 
@@ -291,7 +295,7 @@ export const TOOL_DEFS: WebMCPToolDefinition[] = [
       );
       return outcome.ok
         ? ok("erase_pixels", outcome.detail, { affectedPixels: pixels.length })
-        : fail("erase_pixels", errCode(outcome.detail), outcome.detail);
+        : fail("erase_pixels", errCode(outcome.detail), cleanDetail(outcome.detail));
     },
   },
 
@@ -325,7 +329,7 @@ export const TOOL_DEFS: WebMCPToolDefinition[] = [
       const outcome = runTool("fill_region", () =>
         useEditorStore.getState().floodFill(x, y, color, { layerId, frameId, actor: AGENT }),
       );
-      return outcome.ok ? ok("fill_region", outcome.detail) : fail("fill_region", errCode(outcome.detail), outcome.detail);
+      return outcome.ok ? ok("fill_region", outcome.detail) : fail("fill_region", errCode(outcome.detail), cleanDetail(outcome.detail));
     },
   },
 
@@ -359,7 +363,7 @@ export const TOOL_DEFS: WebMCPToolDefinition[] = [
           actor: AGENT,
         }),
       );
-      return outcome.ok ? ok("replace_color", outcome.detail) : fail("replace_color", errCode(outcome.detail), outcome.detail);
+      return outcome.ok ? ok("replace_color", outcome.detail) : fail("replace_color", errCode(outcome.detail), cleanDetail(outcome.detail));
     },
   },
 
@@ -525,7 +529,7 @@ export const TOOL_DEFS: WebMCPToolDefinition[] = [
       const dy = int(input.dy);
       if (Number.isNaN(dx) || Number.isNaN(dy)) return fail("move_region", "INVALID_ARGUMENTS", "dx and dy must be integers.");
       const outcome = runTool("move_region", () => useEditorStore.getState().moveRegion(dx, dy, { actor: AGENT }));
-      return outcome.ok ? ok("move_region", outcome.detail) : fail("move_region", errCode(outcome.detail), outcome.detail);
+      return outcome.ok ? ok("move_region", outcome.detail) : fail("move_region", errCode(outcome.detail), cleanDetail(outcome.detail));
     },
   },
 
@@ -548,7 +552,7 @@ export const TOOL_DEFS: WebMCPToolDefinition[] = [
       const outcome = runTool("flip_region", () =>
         useEditorStore.getState().flipRegion(direction, { actor: AGENT }),
       );
-      return outcome.ok ? ok("flip_region", outcome.detail) : fail("flip_region", errCode(outcome.detail), outcome.detail);
+      return outcome.ok ? ok("flip_region", outcome.detail) : fail("flip_region", errCode(outcome.detail), cleanDetail(outcome.detail));
     },
   },
 
@@ -559,7 +563,7 @@ export const TOOL_DEFS: WebMCPToolDefinition[] = [
     inputSchema: { type: "object", properties: {} },
     execute: async () => {
       const outcome = runTool("clear_region", () => useEditorStore.getState().clearRegion({ actor: AGENT }));
-      return outcome.ok ? ok("clear_region", outcome.detail) : fail("clear_region", errCode(outcome.detail), outcome.detail);
+      return outcome.ok ? ok("clear_region", outcome.detail) : fail("clear_region", errCode(outcome.detail), cleanDetail(outcome.detail));
     },
   },
 
@@ -582,7 +586,7 @@ export const TOOL_DEFS: WebMCPToolDefinition[] = [
       const colors = Array.isArray(input.colors) ? input.colors.map((c) => str(c)) : [];
       if (colors.length === 0) return fail("set_palette", "INVALID_ARGUMENTS", "colors must be a non-empty array of hex strings.");
       const outcome = runTool("set_palette", () => useEditorStore.getState().setPalette(colors, { actor: AGENT }));
-      return outcome.ok ? ok("set_palette", outcome.detail) : fail("set_palette", errCode(outcome.detail), outcome.detail);
+      return outcome.ok ? ok("set_palette", outcome.detail) : fail("set_palette", errCode(outcome.detail), cleanDetail(outcome.detail));
     },
   },
 
