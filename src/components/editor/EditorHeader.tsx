@@ -20,11 +20,11 @@ function WebMCPBadge() {
   );
 }
 
-/** Middle section of the header row: centered logo + WebMCP badge on the far right. */
+/** Centered logo + WebMCP badge, all vertically aligned on the menu row. */
 export function EditorHeader() {
   return (
     <>
-      <div className="flex items-center justify-center gap-2">
+      <div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2">
         <div className="grid h-6 w-6 grid-cols-2 grid-rows-2 gap-px overflow-hidden rounded ring-1 ring-white/15">
           <span className="bg-accent" />
           <span className="bg-agent" />
@@ -36,7 +36,9 @@ export function EditorHeader() {
           <span className="block text-[7px] uppercase tracking-[0.18em] text-faint">agent-native pixel studio</span>
         </div>
       </div>
-      <WebMCPBadge />
+      <div className="ml-auto">
+        <WebMCPBadge />
+      </div>
     </>
   );
 }
