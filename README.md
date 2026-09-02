@@ -1,5 +1,7 @@
 # PixelForge
 
+<img src="branding/mascot.png" alt="PixelForge mascot" width="180" align="right" />
+
 > **An agent-native pixel art studio** — where humans and AI agents collaborate on the same canvas.
 
 The editing experience follows the classic pixel-art studio model: cel-based layers × frames animation, onion skinning, a live preview, ready-made palettes, tiled drawing and rulers — with WebMCP as a first-class second interface to all of it.

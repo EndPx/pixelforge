@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useEditorStore } from "../../editor/store";
+import mascotUrl from "../../assets/mascot.png";
 
 const TOOL_ICONS: Record<string, string> = {
   get_editor_state: "🔍",
@@ -59,12 +60,20 @@ export function AgentPanel({ onClose }: { onClose?: () => void }) {
 
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto p-1">
         {activity.length === 0 ? (
-          <div className="px-2 py-8 text-center text-xs leading-relaxed text-faint">
-            No activity yet.
-            <br />
-            <span className="text-dim">
-              Open this page in ChatGPT's browser or an agent client and ask it to draw — every WebMCP tool call lands here.
-            </span>
+          <div className="flex flex-col items-center gap-3 px-3 py-6 text-center">
+            <img
+              src={mascotUrl}
+              alt="PixelForge mascot — a pixel slime blacksmith"
+              className="h-24 w-24 rounded border border-edge2"
+              style={{ imageRendering: "auto" }}
+            />
+            <p className="text-xs leading-relaxed text-faint">
+              No activity yet.
+              <br />
+              <span className="text-dim">
+                Open this page in ChatGPT's browser or an agent client and ask it to draw — every WebMCP tool call lands here.
+              </span>
+            </p>
           </div>
         ) : (
           <ul className="flex flex-col gap-px">
