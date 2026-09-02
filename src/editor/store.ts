@@ -556,7 +556,7 @@ export function createEditorStore(width = 32, height = 32) {
         });
       },
 
-      moveRegion: (dx, dy, opts = {}) => {
+      moveRegion: (rawDx, rawDy, opts = {}) => {
         const meta: CommitMeta = { actor: opts.actor, action: "move_region", description: "" };
         const s = get();
         if (!s.selection) return logError(meta, "NO_SELECTION", "No region selected.");
@@ -564,12 +564,20 @@ export function createEditorStore(width = 32, height = 32) {
         const frame = activeFrame(s);
         const layer = frame.layers.find((l) => l.id === s.activeLayerId);
         if (!layer) return logError(meta, "LAYER_NOT_FOUND", "Layer not found");
+        // Clamp the shift so the selection never leaves the canvas — moving an
+        // object out and back must never clip its pixels.
+        const maxLeft = selection.x;
+        const maxUp = selection.y;
+        const maxRight = width - (selection.x + selection.width);
+        const maxDown = height - (selection.y + selection.height);
+        const dx = Math.max(-maxLeft, Math.min(maxRight, rawDx));
+        const dy = Math.max(-maxUp, Math.min(maxDown, rawDy));
+        if (dx === 0 && dy === 0) return logError(meta, "AT_BOUNDARY", "The selection is already at the canvas edge in that direction.");
         const indices = rectIndices(selection, width);
         const moved: { from: number; to: number; color: string | null }[] = [];
         for (const i of indices) {
           const x = (i % width) + dx;
           const y = Math.floor(i / width) + dy;
-          if (x < 0 || x >= width || y < 0 || y >= height) continue;
           moved.push({ from: i, to: y * width + x, color: layer.pixels[i] });
         }
         meta.description = `Moved ${moved.length} pixel(s) by (${dx}, ${dy})`;

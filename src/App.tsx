@@ -106,6 +106,15 @@ export default function App() {
     void registerWebMCPTools();
   }, []);
 
+  // keep browser page-zoom (Ctrl+wheel) out of the editor
+  useEffect(() => {
+    const blockBrowserZoom = (e: WheelEvent) => {
+      if (e.ctrlKey) e.preventDefault();
+    };
+    document.addEventListener("wheel", blockBrowserZoom, { passive: false });
+    return () => document.removeEventListener("wheel", blockBrowserZoom);
+  }, []);
+
   useEffect(() => {
     const move = (e: PointerEvent) => {
       if (!dragRef.current) return;
