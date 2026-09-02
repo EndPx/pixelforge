@@ -49,6 +49,11 @@ function useKeyboardShortcuts() {
         store.setPlaying(!store.isPlaying);
         return;
       }
+      if ((e.key === "Delete" || e.key === "Backspace") && store.selection) {
+        e.preventDefault();
+        store.clearRegion();
+        return;
+      }
       if (e.ctrlKey || e.metaKey) return;
       switch (e.key.toLowerCase()) {
         case "b": store.setTool("pencil"); break;
@@ -127,7 +132,7 @@ export default function App() {
       {/* row 3: tool options (LibreSprite-style context bar) */}
       <div className="flex shrink-0 items-center gap-3 border-b border-edge bg-panel px-3 py-1">
         <BrushSizeControl />
-        <span className="text-[10px] text-faint">Right-click paints with the secondary color · Space+drag pans · Scroll zooms</span>
+        <span className="text-[10px] text-faint">Right-click paints secondary · Del clears selection · Space+drag pans · Scroll zooms</span>
       </div>
 
       {/* row 4: docks + canvas */}

@@ -2,7 +2,8 @@ import { useEffect, useRef } from "react";
 import { useEditorStore } from "../../editor/store";
 import { renderFrameToImageData } from "../../editor/render";
 
-/** Aseprite-style always-on animated preview of the sprite (all frames, respecting durations). */
+/** Aseprite/LibreSprite-style preview: follows the active frame while paused,
+ *  loops the whole animation while playing. */
 export function PreviewPanel() {
   const ref = useRef<HTMLCanvasElement>(null);
 
@@ -13,25 +14,35 @@ export function PreviewPanel() {
     let last = performance.now();
     let index = 0;
 
+    const drawFrame = (frameIndex: number) => {
+      const canvas = ref.current;
+      if (!canvas) return;
+      const { frames, width, height } = useEditorStore.getState();
+      if (frames.length === 0) return;
+      const shown = frames[Math.min(frameIndex, frames.length - 1)];
+      if (canvas.width !== width) canvas.width = width;
+      if (canvas.height !== height) canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      ctx.clearRect(0, 0, width, height);
+      ctx.putImageData(renderFrameToImageData(shown, width, height, ctx), 0, 0);
+    };
+
     const loop = (now: number) => {
       if (cancelled) return;
-      const { frames, width, height } = useEditorStore.getState();
-      const canvas = ref.current;
-      if (canvas && frames.length > 0) {
+      const { frames, activeFrameId, isPlaying } = useEditorStore.getState();
+      if (!isPlaying || frames.length <= 1) {
+        index = frames.findIndex((f) => f.id === activeFrameId);
+        elapsed = 0;
+        drawFrame(Math.max(0, index));
+      } else {
         const current = frames[Math.min(index, frames.length - 1)];
         elapsed += now - last;
         if (elapsed >= Math.max(60, current?.duration ?? 300)) {
           elapsed = 0;
           index = (index + 1) % frames.length;
         }
-        const shown = frames[Math.min(index, frames.length - 1)];
-        if (canvas.width !== width) canvas.width = width;
-        if (canvas.height !== height) canvas.height = height;
-        const ctx = canvas.getContext("2d");
-        if (ctx) {
-          ctx.clearRect(0, 0, width, height);
-          ctx.putImageData(renderFrameToImageData(shown, width, height, ctx), 0, 0);
-        }
+        drawFrame(index);
       }
       last = now;
       raf = requestAnimationFrame(loop);
@@ -55,7 +66,7 @@ export function PreviewPanel() {
           className="h-20 w-20 border border-edge2"
           style={{
             imageRendering: "pixelated",
-            background: "repeating-conic-gradient(#b9b9b9 0% 25%, #a6a6a6 0% 50%) 50% / 8px 8px",
+            background: "repeating-conic-gradient(#939393 0% 25%, #7d7d7d 0% 50%) 50% / 8px 8px",
           }}
         />
       </div>
