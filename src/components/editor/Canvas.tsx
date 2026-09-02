@@ -659,25 +659,30 @@ export function Canvas() {
         <span className="ml-auto">Frame: {frameIndex + 1}</span>
         <div ref={zoomMenuRef} className="relative">
           {zoomMenuOpen && (
-            <div className="pf-card absolute bottom-full right-0 z-30 mb-1 flex items-center gap-0.5 p-1 shadow-xl">
-              {[25, 50, 100, 200, 400, 800, 1600, 3200, 6400]
-                .filter((pct) => (pct / 100) * 16 <= Math.max(16, Math.floor(30000 / Math.max(width, height))))
-                .map((pct) => {
-                  const z = Math.round((pct / 100) * 16);
-                  return (
-                    <button
-                      key={pct}
-                      onClick={() => {
-                        setPan({ x: 0, y: 0 });
-                        useEditorStore.getState().setZoom(z);
-                        setZoomMenuOpen(false);
-                      }}
-                      className={`pf-btn px-1.5 py-0.5 text-[10px] tabular-nums ${zoom === z ? "is-on font-bold" : ""}`}
-                    >
-                      {pct}%
-                    </button>
-                  );
-                })}
+            <div className="pf-card absolute bottom-full right-0 z-30 mb-1 w-72 p-2 shadow-xl">
+              <div className="relative">
+                <span className="pointer-events-none absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 rounded border border-edge2 bg-panel px-2 py-0.5 font-mono text-xs text-ink">
+                  {Math.round((zoom / 16) * 100)}%
+                </span>
+                <input
+                  type="range"
+                  min={2}
+                  max={Math.max(16, Math.floor(30000 / Math.max(width, height)))}
+                  step={2}
+                  value={zoom}
+                  onChange={(e) => {
+                    // anchor zooming at the canvas center while sliding
+                    const store = useEditorStore.getState();
+                    const nz = Number(e.target.value);
+                    setPan((pn) => ({
+                      x: pn.x + (width / 2) * (store.zoom - nz),
+                      y: pn.y + (height / 2) * (store.zoom - nz),
+                    }));
+                    store.setZoom(nz);
+                  }}
+                  className="h-1.5 w-full accent-[#58a6dd]"
+                />
+              </div>
             </div>
           )}
           <button
