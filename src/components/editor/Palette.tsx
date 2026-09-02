@@ -122,6 +122,8 @@ export function Palette() {
         </div>
       </div>
 
+      <div className="flex-1" />
+
       {/* fg/bg pair + load palette */}
       <div className="flex items-center gap-2">
         <div className="relative h-10 w-10 shrink-0">

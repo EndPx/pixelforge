@@ -49,6 +49,16 @@ function useKeyboardShortcuts() {
         store.setPlaying(!store.isPlaying);
         return;
       }
+      if (e.key === "F7") {
+        e.preventDefault();
+        store.togglePreview();
+        return;
+      }
+      if (e.key === "Tab") {
+        e.preventDefault();
+        store.toggleTimeline();
+        return;
+      }
       if ((e.key === "Delete" || e.key === "Backspace") && store.selection) {
         e.preventDefault();
         store.clearRegion();
@@ -138,21 +148,16 @@ export default function App() {
       <div className="shrink-0 border-b border-edge px-2 pb-1">
         <MenuBar onFit={() => document.dispatchEvent(new CustomEvent("pixelforge:fit"))} />
       </div>
-      {/* row 3: docks + canvas */}
+      {/* row 3: full-height color dock | canvas + timeline | tools + agent */}
       <div className="flex min-h-0 flex-1 gap-1 p-1">
-        {/* left dock: colors only */}
-        <aside className="pf-card flex w-48 shrink-0 flex-col overflow-hidden">
+        {/* left dock: colors, full height (spans past the timeline) */}
+        <aside className="pf-card flex w-44 shrink-0 flex-col overflow-hidden">
           <div className="min-h-0 flex-1 overflow-y-auto">
             <Palette />
           </div>
-          {previewVisible && (
-            <div className="border-t border-edge/70">
-              <PreviewPanel />
-            </div>
-          )}
         </aside>
 
-        {/* center: tool options directly above the canvas */}
+        {/* center: tool options above canvas, timeline below */}
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <div className="flex shrink-0 items-center gap-3 border border-edge bg-panel px-3 py-1">
             <BrushSizeControl />
@@ -163,12 +168,44 @@ export default function App() {
           <main className="flex min-h-0 flex-1 flex-col overflow-hidden border border-edge bg-editor">
             <Canvas />
           </main>
+          {timelineVisible && (
+            <>
+              <div
+                className="h-1.5 shrink-0 cursor-row-resize bg-edge hover:bg-accent"
+                onPointerDown={(e) => {
+                  (e.target as HTMLElement).setPointerCapture(e.pointerId);
+                  dragRef.current = { startY: e.clientY, startH: timelineHeight };
+                }}
+                title="Drag to resize the timeline"
+              />
+              <div className="pf-card shrink-0 overflow-hidden" style={{ height: timelineHeight }}>
+                <CelTimeline />
+              </div>
+            </>
+          )}
         </div>
 
-        {/* right: tool strip + agent panel */}
+        {/* right: tool strip + agent panel + mini toggles */}
         <div className="flex shrink-0 gap-1">
-          <aside className="pf-card flex w-10 flex-col items-center py-1.5">
+          <aside className="pf-card flex w-10 shrink-0 flex-col items-center py-1.5">
             <Toolbar />
+            <div className="flex flex-1" />
+            <div className="flex flex-col gap-1">
+              <button
+                onClick={() => useEditorStore.getState().togglePreview()}
+                title={previewVisible ? "Hide preview (F7)" : "Show preview (F7)"}
+                className={`pf-btn h-7 w-7 p-0 text-[11px] ${previewVisible ? "is-on" : ""}`}
+              >
+                ▶
+              </button>
+              <button
+                onClick={() => useEditorStore.getState().toggleTimeline()}
+                title={timelineVisible ? "Hide timeline (Tab)" : "Show timeline (Tab)"}
+                className={`pf-btn h-7 w-7 p-0 text-[11px] ${timelineVisible ? "is-on" : ""}`}
+              >
+                ▤
+              </button>
+            </div>
           </aside>
           {agentOpen && (
             <aside className="pf-card flex w-72 shrink-0 flex-col overflow-hidden">
@@ -188,22 +225,8 @@ export default function App() {
         </button>
       )}
 
-      {/* row 5: resizable timeline */}
-      {timelineVisible && (
-        <>
-          <div
-            className="h-1.5 shrink-0 cursor-row-resize bg-edge hover:bg-accent"
-            onPointerDown={(e) => {
-              (e.target as HTMLElement).setPointerCapture(e.pointerId);
-              dragRef.current = { startY: e.clientY, startH: timelineHeight };
-            }}
-            title="Drag to resize the timeline"
-          />
-          <div className="pf-card mx-1 mb-1 shrink-0 overflow-hidden" style={{ height: timelineHeight }}>
-            <CelTimeline />
-          </div>
-        </>
-      )}
+      {/* floating draggable preview window */}
+      <PreviewPanel />
     </div>
   );
 }
