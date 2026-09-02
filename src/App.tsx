@@ -204,17 +204,22 @@ export default function App() {
         {/* right: tool strip (vertically centered) + agent panel (full height) */}
         <div className="flex shrink-0 items-stretch gap-1">
           <aside className="pf-card flex w-10 shrink-0 flex-col items-center py-1.5">
-            <div className="flex flex-1 flex-col items-center justify-center">
+            {/* canvas tools — top */}
+            <div className="flex flex-col items-center">
               <Toolbar />
             </div>
-            <div className="mt-1 flex flex-col gap-1">
+            {/* agent toggle — centered in the remaining space */}
+            <div className="flex flex-1 flex-col items-center justify-center">
               <button
-                onClick={() => useEditorStore.getState().togglePreview()}
-                title={previewVisible ? "Hide preview (F7)" : "Show preview (F7)"}
-                className={`pf-btn h-7 w-7 p-0 text-[11px] ${previewVisible ? "is-on" : ""}`}
+                onClick={() => setAgentOpen((v) => !v)}
+                title={agentOpen ? "Hide agent panel" : "Show agent panel"}
+                className={`pf-btn h-7 w-7 p-0 text-[12px] ${agentOpen ? "is-on" : ""}`}
               >
-                ▶
+                🤖
               </button>
+            </div>
+            {/* timeline + preview toggles — bottom */}
+            <div className="flex flex-col gap-1">
               <button
                 onClick={() => useEditorStore.getState().toggleTimeline()}
                 title={timelineVisible ? "Hide timeline (Tab)" : "Show timeline (Tab)"}
@@ -223,11 +228,11 @@ export default function App() {
                 ▤
               </button>
               <button
-                onClick={() => setAgentOpen((v) => !v)}
-                title={agentOpen ? "Hide agent panel" : "Show agent panel"}
-                className={`pf-btn h-7 w-7 p-0 text-[11px] ${agentOpen ? "is-on" : ""}`}
+                onClick={() => useEditorStore.getState().togglePreview()}
+                title={previewVisible ? "Hide preview (F7)" : "Show preview (F7)"}
+                className={`pf-btn h-7 w-7 p-0 text-[11px] ${previewVisible ? "is-on" : ""}`}
               >
-                🤖
+                ▶
               </button>
             </div>
           </aside>
