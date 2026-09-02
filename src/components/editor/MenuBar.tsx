@@ -135,7 +135,7 @@ export function MenuBar({ onFit }: { onFit: () => void }) {
       items: [
         { label: "Visible", shortcut: "Shift+X", check: layer.visible, onClick: () => store.getState().toggleLayerVisibility(activeLayerId) },
         "sep" as const,
-        { label: "New Layer", shortcut: "Ctrl+Shift+N", onClick: () => store.getState().createLayer() },
+        { label: "New Layer", shortcut: "Shift+N", onClick: () => store.getState().createLayer() },
         { label: "Remove Layer", onClick: () => store.getState().deleteLayer(activeLayerId), disabled: frame.layers.length <= 1 },
         "sep" as const,
         { label: "Duplicate", shortcut: "Ctrl+J", onClick: () => store.getState().duplicateLayer() },
