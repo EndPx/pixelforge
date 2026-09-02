@@ -145,7 +145,7 @@ export function Palette() {
                 ↓
               </button>
               {menu === "sort" && (
-                <div className="pf-card absolute right-0 top-full z-50 mt-1 min-w-44 p-1 shadow-xl">
+                <div className="pf-card absolute left-0 top-full z-50 mt-1 min-w-44 p-1 shadow-xl">
                   {[
                     { label: "Reverse Colors", run: () => useEditorStore.getState().reversePalette() },
                     { label: "Gradient", run: () => useEditorStore.getState().gradientPalette(false) },
@@ -191,7 +191,7 @@ export function Palette() {
                 ⬛
               </button>
               {menu === "presets" && (
-                <div className="pf-card absolute right-0 top-full z-50 mt-1 min-w-36 p-1 shadow-xl">
+                <div className="pf-card absolute left-0 top-full z-50 mt-1 min-w-36 p-1 shadow-xl">
                   {Object.keys(PALETTE_PRESETS).map((name) => (
                     <button
                       key={name}
@@ -216,7 +216,7 @@ export function Palette() {
                 ☰
               </button>
               {menu === "settings" && (
-                <div className="pf-card absolute right-0 top-full z-50 mt-1 min-w-44 p-1 shadow-xl">
+                <div className="pf-card absolute left-0 top-full z-50 mt-1 min-w-44 p-1 shadow-xl">
                   {[
                     { label: "Save Palette", run: () => useEditorStore.getState().savePaletteLocal() },
                     { label: "Load Saved Palette", run: () => useEditorStore.getState().loadPaletteLocal() },

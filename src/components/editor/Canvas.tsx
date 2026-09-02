@@ -32,13 +32,30 @@ function bresenham(x0: number, y0: number, x1: number, y1: number): { x: number;
   return points;
 }
 
-/** Expand a point to an NxN brush block, clamped to the canvas. */
-function brushBlock(x: number, y: number, size: number, width: number, height: number): { x: number; y: number }[] {
+type BrushShape = "square" | "circle" | "line";
+
+/** Expand a point to an NxN brush footprint (square / circle / line), clamped to the canvas. */
+function brushBlock(
+  x: number,
+  y: number,
+  size: number,
+  width: number,
+  height: number,
+  shape: BrushShape,
+): { x: number; y: number }[] {
   if (size <= 1) return [{ x, y }];
   const half = Math.floor(size / 2);
+  const r = size / 2;
   const out: { x: number; y: number }[] = [];
   for (let dy = 0; dy < size; dy++) {
     for (let dx = 0; dx < size; dx++) {
+      if (shape === "circle") {
+        const ddx = dx + 0.5 - r;
+        const ddy = dy + 0.5 - r;
+        if (ddx * ddx + ddy * ddy > r * r) continue;
+      } else if (shape === "line") {
+        if (dx !== dy && dx !== dy + 1) continue;
+      }
       const px = x + dx - half;
       const py = y + dy - half;
       if (px >= 0 && px < width && py >= 0 && py < height) out.push({ x: px, y: py });
@@ -59,6 +76,7 @@ export function Canvas() {
   const activeColor = useEditorStore((s) => s.activeColor);
   const secondaryColor = useEditorStore((s) => s.secondaryColor);
   const brushSize = useEditorStore((s) => s.brushSize);
+  const brushShape = useEditorStore((s) => s.brushShape);
   const pixelPerfect = useEditorStore((s) => s.pixelPerfect);
   const gridVisible = useEditorStore((s) => s.gridVisible);
   const onionSkin = useEditorStore((s) => s.onionSkin);
@@ -66,6 +84,7 @@ export function Canvas() {
   const mainRef = useRef<HTMLCanvasElement>(null);
   const underlayRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
+  const floatRef = useRef<HTMLCanvasElement>(null); // move-drag preview, spans the workspace
   const containerRef = useRef<HTMLDivElement>(null);
 
   const strokeRef = useRef<Map<number, PixelInput>>(new Map());
@@ -77,18 +96,31 @@ export function Canvas() {
   const selectPreviewRef = useRef<Rect | null>(null);
   const moveStartRef = useRef<{ x: number; y: number } | null>(null);
   const moveOffsetRef = useRef<{ dx: number; dy: number } | null>(null);
+  const moveSnapRef = useRef<{ rect: Rect; content: (string | null)[] } | null>(null);
   const hoverRef = useRef<{ x: number; y: number } | null>(null);
   const panStartRef = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
   const spaceDownRef = useRef(false);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [coords, setCoords] = useState<{ x: number; y: number } | null>(null);
+  const [zoomMenuOpen, setZoomMenuOpen] = useState(false);
+  const zoomMenuRef = useRef<HTMLDivElement>(null);
   const workspaceRef = useRef<HTMLDivElement>(null);
+
+  // close the zoom selector on outside click
+  useEffect(() => {
+    if (!zoomMenuOpen) return;
+    const close = (e: MouseEvent) => {
+      if (!zoomMenuRef.current?.contains(e.target as Node)) setZoomMenuOpen(false);
+    };
+    window.addEventListener("mousedown", close);
+    return () => window.removeEventListener("mousedown", close);
+  }, [zoomMenuOpen]);
 
   const frame = getActiveFrame({ frames, activeFrameId });
   const frameIndex = frames.findIndex((f) => f.id === frame.id);
 
-  // main composite render
-  useEffect(() => {
+  // main composite render — with live stroke pixels applied (real-time erase/paint)
+  const renderMain = useCallback(() => {
     const canvas = mainRef.current;
     if (!canvas) return;
     canvas.width = width;
@@ -96,8 +128,20 @@ export function Canvas() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     ctx.clearRect(0, 0, width, height);
-    ctx.putImageData(renderFrameToImageData(frame, width, height, ctx), 0, 0);
+    const override =
+      strokeActiveRef.current && strokeRef.current.size > 0
+        ? (i: number) => {
+            const p = strokeRef.current.get(i);
+            if (!p) return undefined;
+            return p.color ?? null;
+          }
+        : undefined;
+    ctx.putImageData(renderFrameToImageData(frame, width, height, ctx, { strokeOverride: override }), 0, 0);
   }, [frame, width, height]);
+
+  useEffect(() => {
+    renderMain();
+  }, [renderMain]);
 
   // onion skin underlay (previous = bluish ghost, next = reddish ghost)
   useEffect(() => {
@@ -172,26 +216,6 @@ export function Canvas() {
         );
       }
 
-      // stroke preview
-      if (strokeActiveRef.current && strokeRef.current.size > 0) {
-        const eraser = tool === "eraser";
-        for (const p of strokeRef.current.values()) {
-          const color = p.color ?? activeColor;
-          const rgba = hexToRgba(eraser ? "#ffffff" : color);
-          if (!rgba) continue;
-          if (eraser) {
-            ctx.fillStyle = "rgba(255,255,255,0.45)";
-            ctx.fillRect(p.x * zoom, p.y * zoom, zoom, zoom);
-            ctx.strokeStyle = "rgba(255,80,80,0.9)";
-            ctx.lineWidth = 1;
-            ctx.strokeRect(p.x * zoom + 0.5, p.y * zoom + 0.5, zoom - 1, zoom - 1);
-          } else {
-            ctx.fillStyle = `rgba(${rgba.r},${rgba.g},${rgba.b},${rgba.a})`;
-            ctx.fillRect(p.x * zoom, p.y * zoom, zoom, zoom);
-          }
-        }
-      }
-
       // selection: marching ants
       const rect = selectPreviewRef.current ?? selection;
       if (rect) {
@@ -207,29 +231,14 @@ export function Canvas() {
         ctx.lineDashOffset = 0;
       }
 
-      // move preview: ghost outline shifted
-      if (moveOffsetRef.current && selection) {
-        const { dx, dy } = moveOffsetRef.current;
-        ctx.strokeStyle = "rgba(250,204,21,0.9)";
-        ctx.lineWidth = 1.5;
-        ctx.setLineDash([4, 3]);
-        ctx.strokeRect(
-          (selection.x + dx) * zoom + 0.5,
-          (selection.y + dy) * zoom + 0.5,
-          selection.width * zoom - 1,
-          selection.height * zoom - 1,
-        );
-        ctx.setLineDash([]);
-      }
-
       // hover highlight (1px brush only)
-      if (hover && !strokeActiveRef.current && !(tool === "pencil" && brushSize > 1)) {
+      if (hover && !strokeActiveRef.current && brushSize === 1) {
         ctx.strokeStyle = "rgba(255,255,255,0.45)";
         ctx.lineWidth = 1;
         ctx.strokeRect(hover.x * zoom + 0.5, hover.y * zoom + 0.5, zoom - 1, zoom - 1);
       }
     },
-    [width, height, zoom, selection, tool, activeColor, gridVisible, brushSize],
+    [width, height, zoom, selection, tool, gridVisible, brushSize],
   );
 
   // redraw overlay on state changes
@@ -266,6 +275,54 @@ export function Canvas() {
     };
   }, []);
 
+  // ---- move-drag floating preview (content can travel beyond the canvas) ----
+  const drawFloat = useCallback(() => {
+    const canvas = floatRef.current;
+    const ws = workspaceRef.current;
+    const container = containerRef.current;
+    if (!canvas || !ws || !container) return;
+    const w = ws.clientWidth;
+    const h = ws.clientHeight;
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w;
+      canvas.height = h;
+    }
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.clearRect(0, 0, w, h);
+
+    const snap = moveSnapRef.current;
+    const offset = moveOffsetRef.current;
+    if (!snap || !offset || !moveStartRef.current) return;
+    const wsRect = ws.getBoundingClientRect();
+    const cRect = container.getBoundingClientRect();
+    const originX = cRect.left - wsRect.left;
+    const originY = cRect.top - wsRect.top;
+
+    ctx.imageSmoothingEnabled = false;
+    for (let y = 0; y < snap.rect.height; y++) {
+      for (let x = 0; x < snap.rect.width; x++) {
+        const color = snap.content[y * snap.rect.width + x];
+        if (!color) continue;
+        const rgba = hexToRgba(color);
+        if (!rgba) continue;
+        ctx.fillStyle = `rgba(${rgba.r},${rgba.g},${rgba.b},${rgba.a})`;
+        ctx.fillRect(originX + (snap.rect.x + x + offset.dx) * zoom, originY + (snap.rect.y + y + offset.dy) * zoom, zoom, zoom);
+      }
+    }
+    // dashed outline of the moved rect
+    ctx.strokeStyle = "rgba(250,204,21,0.9)";
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 3]);
+    ctx.strokeRect(
+      originX + (snap.rect.x + offset.dx) * zoom + 0.5,
+      originY + (snap.rect.y + offset.dy) * zoom + 0.5,
+      snap.rect.width * zoom - 1,
+      snap.rect.height * zoom - 1,
+    );
+    ctx.setLineDash([]);
+  }, [zoom]);
+
   const toPixel = useCallback(
     (e: React.PointerEvent | React.MouseEvent): { x: number; y: number } | null => {
       const el = containerRef.current;
@@ -283,12 +340,12 @@ export function Canvas() {
     (x: number, y: number) => {
       // right button paints with the secondary color; eraser always erases
       const color = tool === "eraser" ? null : strokeButtonRef.current === 2 ? secondaryColor : activeColor;
-      for (const pt of brushBlock(x, y, brushSize, width, height)) {
+      for (const pt of brushBlock(x, y, brushSize, width, height, brushShape)) {
         const idx = pt.y * width + pt.x;
         // Pixel-perfect (LibreSprite/Aseprite): drop the middle pixel of an
-        // L-shaped diagonal step so strokes keep a clean 1px line.
+        // L-shaped diagonal step so 1px strokes stay clean.
         const order = strokeOrderRef.current;
-        if (pixelPerfect && brushSize === 1 && order.length >= 2) {
+        if (pixelPerfect && brushSize === 1 && brushShape === "square" && order.length >= 2) {
           const prev = order[order.length - 1];
           const prev2 = order[order.length - 2];
           const px1 = prev % width, py1 = Math.floor(prev / width);
@@ -304,7 +361,7 @@ export function Canvas() {
         if (order[order.length - 1] !== idx) order.push(idx);
       }
     },
-    [tool, activeColor, secondaryColor, brushSize, width, height, pixelPerfect],
+    [tool, activeColor, secondaryColor, brushSize, brushShape, width, height, pixelPerfect],
   );
 
   const onPointerDown = (e: React.PointerEvent) => {
@@ -328,6 +385,7 @@ export function Canvas() {
       strokeActiveRef.current = true;
       addStrokePixel(p.x, p.y);
       lastPointRef.current = p;
+      renderMain();
     } else if (tool === "fill") {
       store.floodFill(p.x, p.y, e.button === 2 ? store.secondaryColor : store.activeColor);
     } else if (tool === "picker") {
@@ -349,8 +407,21 @@ export function Canvas() {
       if (store.selection) {
         moveStartRef.current = p;
       } else if (store.selectBlob(p.x, p.y)) {
-        // grab the contiguous object under the cursor — no manual selection needed
         moveStartRef.current = p;
+      }
+      // snapshot the selection content for the floating drag preview
+      const st = useEditorStore.getState();
+      if (moveStartRef.current && st.selection) {
+        const sel = st.selection;
+        const fr = getActiveFrame(st);
+        const la = fr.layers.find((l) => l.id === st.activeLayerId) ?? fr.layers[fr.layers.length - 1];
+        const content: (string | null)[] = [];
+        for (let y = 0; y < sel.height; y++) {
+          for (let x = 0; x < sel.width; x++) {
+            content.push(la.pixels[(sel.y + y) * st.width + (sel.x + x)] ?? null);
+          }
+        }
+        moveSnapRef.current = { rect: { ...sel }, content };
       }
     }
     drawOverlay();
@@ -374,6 +445,7 @@ export function Canvas() {
       const line = bresenham(lastPointRef.current.x, lastPointRef.current.y, p.x, p.y);
       for (const pt of line) addStrokePixel(pt.x, pt.y);
       lastPointRef.current = p;
+      renderMain();
     } else if (selectStartRef.current) {
       const s = selectStartRef.current;
       selectPreviewRef.current = {
@@ -384,9 +456,10 @@ export function Canvas() {
       };
     } else if (moveStartRef.current) {
       moveOffsetRef.current = { dx: p.x - moveStartRef.current.x, dy: p.y - moveStartRef.current.y };
+      drawFloat();
     }
 
-    if (changed || strokeActiveRef.current || selectPreviewRef.current || moveOffsetRef.current) drawOverlay();
+    if (changed || strokeActiveRef.current || selectPreviewRef.current) drawOverlay();
   };
 
   const onPointerUp = () => {
@@ -411,7 +484,11 @@ export function Canvas() {
       if (dx !== 0 || dy !== 0) store.moveRegion(dx, dy);
       moveStartRef.current = null;
       moveOffsetRef.current = null;
+      moveSnapRef.current = null;
+      const canvas = floatRef.current;
+      canvas?.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
     }
+    renderMain();
     drawOverlay();
   };
 
@@ -425,9 +502,9 @@ export function Canvas() {
       const container = containerRef.current;
       if (!container) return;
       const rect = container.getBoundingClientRect();
-      const cx = (e.clientX - rect.left) / store.zoom; // content px under cursor
+      const cx = (e.clientX - rect.left) / store.zoom;
       const cy = (e.clientY - rect.top) / store.zoom;
-      const nz = store.zoom + (e.deltaY < 0 ? 2 : -2); // store clamps by canvas size
+      const nz = store.zoom + (e.deltaY < 0 ? 2 : -2);
       setPan((p) => ({ x: p.x + cx * (store.zoom - nz), y: p.y + cy * (store.zoom - nz) }));
       store.setZoom(nz);
     };
@@ -439,7 +516,6 @@ export function Canvas() {
     const ws = workspaceRef.current;
     if (!ws || ws.clientWidth === 0) return;
     const nz = Math.floor(Math.min((ws.clientWidth - 100) / width, (ws.clientHeight - 90) / height) / 2) * 2;
-    // flex centering already centers the canvas; fit = right zoom + zero pan
     setPan({ x: 0, y: 0 });
     useEditorStore.getState().setZoom(nz);
   }, [width, height]);
@@ -450,12 +526,17 @@ export function Canvas() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [width, height]);
 
-  // re-fit once the workspace reaches its real layout size (panels settling, resize)
+  // fit once when the workspace reaches its real layout size; later panel
+  // toggles (timeline/agent) must NOT reset the user's zoom
+  const didFitRef = useRef(false);
   useEffect(() => {
     const ws = workspaceRef.current;
     if (!ws) return;
     const ro = new ResizeObserver(() => {
-      if (ws.clientWidth > 100) fitToWindow();
+      if (!didFitRef.current && ws.clientWidth > 100 && ws.clientHeight > 100) {
+        didFitRef.current = true;
+        fitToWindow();
+      }
     });
     ro.observe(ws);
     return () => ro.disconnect();
@@ -475,6 +556,7 @@ export function Canvas() {
       selectPreviewRef.current = null;
       moveStartRef.current = null;
       moveOffsetRef.current = null;
+      moveSnapRef.current = null;
       drawOverlay();
     };
     document.addEventListener("pixelforge:escape", handler);
@@ -483,29 +565,35 @@ export function Canvas() {
 
   const panning = spaceDownRef.current;
 
-  // per-tool pixel-art cursors
-  const svgCursor = (body: string) =>
+  // per-tool pixel-art cursors with correct hotspots
+  const svgCursor = (body: string, hx: number, hy: number) =>
     `url("data:image/svg+xml;utf8,${encodeURIComponent(
       `<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18'>${body}</svg>`,
-    )}") 4 2, crosshair`;
+    )}") ${hx} ${hy}, crosshair`;
   const CURSORS: Record<string, string> = {
     pencil: svgCursor(
-      "<path d='M3 15l1.5-5L13 1.5 16.5 5 8 13.5 3 15z' fill='%23ffffff' stroke='%23000000' stroke-width='1.4'/><path d='M3 15l3-1-2-2-1 3z' fill='%23000000'/>",
+      "<path d='M2 2l5 1.5L15.5 12 12 15.5 3.5 7 2 2z' fill='%23ffffff' stroke='%23000000' stroke-width='1.4'/><path d='M2 2l1.5 5 2-2L2 2z' fill='%23000000'/>",
+      2, 2,
     ),
     eraser: svgCursor(
-      "<rect x='3' y='7' width='11' height='7' rx='1' fill='%23ffffff' stroke='%23000000' stroke-width='1.4' transform='rotate(-20 8 10)'/><path d='M3 15h12' stroke='%23000000' stroke-width='1.4'/>",
+      "<rect x='2' y='6' width='12' height='8' rx='1' fill='%23ffffff' stroke='%23000000' stroke-width='1.4'/><path d='M2 14h13' stroke='%23000000' stroke-width='1.4'/>",
+      2, 13,
     ),
     fill: svgCursor(
-      "<path d='M8 2l6 6-5 5-6-6 5-5z' fill='%23ffffff' stroke='%23000000' stroke-width='1.3'/><path d='M14 11c1.4 1.6 2 2.8 2 3.7A2 2 0 0112 15c0-1 .8-2.3 2-4z' fill='%2358a6dd' stroke='%23000000' stroke-width='1'/>",
+      "<path d='M8 2l6 6-5 5-6-6 5-5z' fill='%23ffffff' stroke='%23000000' stroke-width='1.3'/><path d='M13 11c1.2 1.4 1.8 2.5 1.8 3.3a1.8 1.8 0 11-3.6 0c0-.8.6-1.9 1.8-3.3z' fill='%2358a6dd' stroke='%23000000' stroke-width='1'/>",
+      8, 13,
     ),
     picker: svgCursor(
-      "<path d='M13 2l3 3-7 7-3-3 7-7z' fill='%23ffffff' stroke='%23000000' stroke-width='1.3'/><path d='M6 9l-3 3v2h2l3-3' fill='%23ffffff' stroke='%23000000' stroke-width='1.3'/>",
+      "<path d='M12 2l4 4-6 6-4-4 6-6z' fill='%23ffffff' stroke='%23000000' stroke-width='1.3'/><path d='M6 8L3 11v3h3l3-3' fill='%23ffffff' stroke='%23000000' stroke-width='1.3'/>",
+      3, 14,
     ),
     select: svgCursor(
       "<rect x='2.5' y='2.5' width='13' height='13' fill='none' stroke='%23000000' stroke-width='1.6' stroke-dasharray='3 2'/><rect x='2.5' y='2.5' width='13' height='13' fill='none' stroke='%23ffffff' stroke-width='1' stroke-dasharray='3 2' stroke-dashoffset='1.5'/>",
+      3, 3,
     ),
     move: svgCursor(
       "<path d='M9 1v16M1 9h16M9 1l-3 3M9 1l3 3M9 17l-3-3M9 17l3-3M1 9l3-3M1 9l3 3M17 9l-3-3M17 9l-3 3' stroke='%23000000' stroke-width='2.4' fill='none'/><path d='M9 1v16M1 9h16M9 1l-3 3M9 1l3 3M9 17l-3-3M9 17l3-3M1 9l3-3M1 9l3 3M17 9l-3-3M17 9l-3 3' stroke='%23ffffff' stroke-width='1.2' fill='none'/>",
+      9, 9,
     ),
   };
   const cursor = panning
@@ -518,7 +606,7 @@ export function Canvas() {
   const checker = 8 * zoom;
 
   return (
-    <div ref={workspaceRef} className="flex min-h-0 flex-1 flex-col overflow-hidden bg-workspace">
+    <div ref={workspaceRef} className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-workspace">
       <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden p-6">
         <div
           ref={containerRef}
@@ -554,6 +642,9 @@ export function Canvas() {
           <canvas ref={overlayRef} className="pointer-events-none absolute inset-0 h-full w-full" />
         </div>
       </div>
+      {/* floating move-drag preview: spans the whole workspace so content stays
+          visible even when dragged beyond the canvas bounds */}
+      <canvas ref={floatRef} className="pointer-events-none absolute inset-0 z-20" />
       {/* LibreSprite-style status bar */}
       <div className="flex shrink-0 items-center gap-4 border-t border-edge bg-panel px-3 py-1 text-[11px] text-dim">
         <span className="font-mono text-ink">{coords ? `${coords.x}, ${coords.y}` : "—"}</span>
@@ -566,10 +657,37 @@ export function Canvas() {
           {width} × {height}
         </span>
         <span className="ml-auto">Frame: {frameIndex + 1}</span>
-        <button className="pf-btn px-1.5" onClick={() => useEditorStore.getState().setZoom(zoom - 2)}>
-          −
-        </button>
-        <span className="w-12 text-center tabular-nums text-ink">{Math.round((zoom / 16) * 100)}%</span>
+        <div ref={zoomMenuRef} className="relative">
+          {zoomMenuOpen && (
+            <div className="pf-card absolute bottom-full right-0 z-30 mb-1 flex items-center gap-0.5 p-1 shadow-xl">
+              {[25, 50, 100, 200, 400, 800, 1600, 3200, 6400]
+                .filter((pct) => (pct / 100) * 16 <= Math.max(16, Math.floor(30000 / Math.max(width, height))))
+                .map((pct) => {
+                  const z = Math.round((pct / 100) * 16);
+                  return (
+                    <button
+                      key={pct}
+                      onClick={() => {
+                        setPan({ x: 0, y: 0 });
+                        useEditorStore.getState().setZoom(z);
+                        setZoomMenuOpen(false);
+                      }}
+                      className={`pf-btn px-1.5 py-0.5 text-[10px] tabular-nums ${zoom === z ? "is-on font-bold" : ""}`}
+                    >
+                      {pct}%
+                    </button>
+                  );
+                })}
+            </div>
+          )}
+          <button
+            className="pf-btn px-1.5"
+            onClick={() => setZoomMenuOpen((v) => !v)}
+            title="Choose zoom level"
+          >
+            <span className="w-10 text-center tabular-nums text-ink">{Math.round((zoom / 16) * 100)}%</span>
+          </button>
+        </div>
         <button className="pf-btn px-1.5" onClick={() => useEditorStore.getState().setZoom(zoom + 2)}>
           +
         </button>

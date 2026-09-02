@@ -10,7 +10,7 @@ function WebMCPBadge() {
           ? "WebMCP connected — agent tools are live on this page"
           : "WebMCP API not detected. Open in ChatGPT's in-app browser, or Chrome with chrome://flags/#enable-webmcp-testing"
       }
-      className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] ${
+      className={`flex items-center gap-1.5 justify-self-end rounded-full px-2.5 py-1 text-[11px] ${
         available ? "bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-400/40" : "bg-panel2 text-dim ring-1 ring-edge2"
       }`}
     >
@@ -20,11 +20,11 @@ function WebMCPBadge() {
   );
 }
 
+/** Middle section of the header row: centered logo + WebMCP badge on the far right. */
 export function EditorHeader() {
   return (
-    <div className="flex items-center justify-between px-2 py-1">
-      <span className="flex-1" />
-      <div className="flex items-center gap-2">
+    <>
+      <div className="flex items-center justify-center gap-2">
         <div className="grid h-6 w-6 grid-cols-2 grid-rows-2 gap-px overflow-hidden rounded ring-1 ring-white/15">
           <span className="bg-accent" />
           <span className="bg-agent" />
@@ -37,6 +37,6 @@ export function EditorHeader() {
         </div>
       </div>
       <WebMCPBadge />
-    </div>
+    </>
   );
 }

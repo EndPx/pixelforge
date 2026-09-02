@@ -10,7 +10,13 @@ export function renderFrameToImageData(
   width: number,
   height: number,
   ctx: CanvasRenderingContext2D,
-  opts: { excludeLayerId?: string; singleLayerId?: string } = {},
+  opts: {
+    excludeLayerId?: string;
+    singleLayerId?: string;
+    /** Live stroke preview: returns the override color for a pixel index
+     *  (null = erase to transparent). Pixels not in the stroke return undefined. */
+    strokeOverride?: (index: number) => string | null | undefined;
+  } = {},
 ): ImageData {
   const out = ctx.createImageData(width, height);
   const size = width * height;
@@ -30,6 +36,13 @@ export function renderFrameToImageData(
         const blended = under ? blendAlphaOver(px, under, alpha) : withAlpha(px, alpha);
         composite[i] = blended;
       }
+    }
+  }
+
+  if (opts.strokeOverride) {
+    for (let i = 0; i < size; i++) {
+      const override = opts.strokeOverride(i);
+      if (override !== undefined) composite[i] = override;
     }
   }
 
