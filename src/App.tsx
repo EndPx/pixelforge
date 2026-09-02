@@ -54,6 +54,11 @@ function useKeyboardShortcuts() {
         store.togglePreview();
         return;
       }
+      if (e.key === "Escape") {
+        document.dispatchEvent(new CustomEvent("pixelforge:escape"));
+        store.deselect();
+        return;
+      }
       if (e.key === "Tab") {
         e.preventDefault();
         store.toggleTimeline();
@@ -86,6 +91,7 @@ function useKeyboardShortcuts() {
 
 function BrushSizeControl() {
   const brushSize = useEditorStore((s) => s.brushSize);
+  const pixelPerfect = useEditorStore((s) => s.pixelPerfect);
   const tool = useEditorStore((s) => s.tool);
   return (
     <div className="flex items-center gap-2 text-[11px] text-dim">
@@ -99,6 +105,16 @@ function BrushSizeControl() {
       <button className="pf-btn px-1.5" onClick={() => useEditorStore.getState().setBrushSize(brushSize + 1)} disabled={brushSize >= 8}>
         +
       </button>
+      <span className="text-edge2">|</span>
+      <label className="flex cursor-pointer items-center gap-1.5 select-none" title="Skip the middle pixel of diagonal steps so pencil lines stay clean">
+        <input
+          type="checkbox"
+          checked={pixelPerfect}
+          onChange={() => useEditorStore.getState().togglePixelPerfect()}
+          className="h-3 w-3 accent-[#58a6dd]"
+        />
+        Pixel-perfect
+      </label>
     </div>
   );
 }
@@ -143,7 +159,7 @@ export default function App() {
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-app text-ink">
       {/* row 1: app header */}
-      <EditorHeader agentOpen={agentOpen} onToggleAgent={() => setAgentOpen((v) => !v)} />
+      <EditorHeader />
       {/* row 2: menu bar */}
       <div className="shrink-0 border-b border-edge px-2 pb-1">
         <MenuBar onFit={() => document.dispatchEvent(new CustomEvent("pixelforge:fit"))} />
@@ -185,12 +201,13 @@ export default function App() {
           )}
         </div>
 
-        {/* right: tool strip + agent panel + mini toggles */}
-        <div className="flex shrink-0 gap-1">
+        {/* right: tool strip (vertically centered) + agent panel (full height) */}
+        <div className="flex shrink-0 items-stretch gap-1">
           <aside className="pf-card flex w-10 shrink-0 flex-col items-center py-1.5">
-            <Toolbar />
-            <div className="flex flex-1" />
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-1 flex-col items-center justify-center">
+              <Toolbar />
+            </div>
+            <div className="mt-1 flex flex-col gap-1">
               <button
                 onClick={() => useEditorStore.getState().togglePreview()}
                 title={previewVisible ? "Hide preview (F7)" : "Show preview (F7)"}
@@ -205,6 +222,13 @@ export default function App() {
               >
                 ▤
               </button>
+              <button
+                onClick={() => setAgentOpen((v) => !v)}
+                title={agentOpen ? "Hide agent panel" : "Show agent panel"}
+                className={`pf-btn h-7 w-7 p-0 text-[11px] ${agentOpen ? "is-on" : ""}`}
+              >
+                🤖
+              </button>
             </div>
           </aside>
           {agentOpen && (
@@ -214,16 +238,6 @@ export default function App() {
           )}
         </div>
       </div>
-
-      {!agentOpen && (
-        <button
-          onClick={() => setAgentOpen(true)}
-          title="Show agent panel"
-          className="fixed right-2 top-1/2 z-30 -translate-y-1/2 rounded-l border border-edge2 bg-panel2 px-1 py-3 text-sm text-dim hover:text-ink"
-        >
-          🤖
-        </button>
-      )}
 
       {/* floating draggable preview window */}
       <PreviewPanel />
