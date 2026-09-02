@@ -52,6 +52,12 @@ export function Palette() {
   const hueRef = useRef<HTMLCanvasElement>(null);
   const [hexInput, setHexInput] = useState(activeColor);
   const [menu, setMenu] = useState<null | "sort" | "presets" | "settings">(null);
+  const [menuPos, setMenuPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const openMenu = (which: "sort" | "presets" | "settings", e: React.MouseEvent) => {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setMenuPos({ x: rect.left, y: rect.bottom + 4 });
+    setMenu(menu === which ? null : which);
+  };
   const [asc, setAsc] = useState(true);
   const menuRef = useRef<HTMLDivElement>(null);
   const editColorRef = useRef<HTMLInputElement>(null);
@@ -139,13 +145,13 @@ export function Palette() {
             <div className="relative">
               <button
                 title="Sort & gradient"
-                onClick={() => setMenu(menu === "sort" ? null : "sort")}
+                onClick={(e) => openMenu("sort", e)}
                 className={`pf-btn h-6 w-6 p-0 text-[11px] ${menu === "sort" ? "is-on" : ""}`}
               >
                 ↓
               </button>
               {menu === "sort" && (
-                <div className="pf-card absolute left-0 top-full z-50 mt-1 min-w-44 p-1 shadow-xl">
+                <div className="pf-card fixed z-50 min-w-44 p-1 shadow-xl" style={{ left: menuPos.x, top: menuPos.y }}>
                   {[
                     { label: "Reverse Colors", run: () => useEditorStore.getState().reversePalette() },
                     { label: "Gradient", run: () => useEditorStore.getState().gradientPalette(false) },
@@ -185,13 +191,13 @@ export function Palette() {
             <div className="relative">
               <button
                 title="Palette presets"
-                onClick={() => setMenu(menu === "presets" ? null : "presets")}
+                onClick={(e) => openMenu("presets", e)}
                 className={`pf-btn h-6 w-6 p-0 text-[11px] ${menu === "presets" ? "is-on" : ""}`}
               >
                 ⬛
               </button>
               {menu === "presets" && (
-                <div className="pf-card absolute left-0 top-full z-50 mt-1 min-w-36 p-1 shadow-xl">
+                <div className="pf-card fixed z-50 min-w-36 p-1 shadow-xl" style={{ left: menuPos.x, top: menuPos.y }}>
                   {Object.keys(PALETTE_PRESETS).map((name) => (
                     <button
                       key={name}
@@ -210,13 +216,13 @@ export function Palette() {
             <div className="relative">
               <button
                 title="Palette settings"
-                onClick={() => setMenu(menu === "settings" ? null : "settings")}
+                onClick={(e) => openMenu("settings", e)}
                 className={`pf-btn h-6 w-6 p-0 text-[11px] ${menu === "settings" ? "is-on" : ""}`}
               >
                 ☰
               </button>
               {menu === "settings" && (
-                <div className="pf-card absolute left-0 top-full z-50 mt-1 min-w-44 p-1 shadow-xl">
+                <div className="pf-card fixed z-50 min-w-44 p-1 shadow-xl" style={{ left: menuPos.x, top: menuPos.y }}>
                   {[
                     { label: "Save Palette", run: () => useEditorStore.getState().savePaletteLocal() },
                     { label: "Load Saved Palette", run: () => useEditorStore.getState().loadPaletteLocal() },

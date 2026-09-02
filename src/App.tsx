@@ -94,50 +94,60 @@ function BrushSizeControl() {
   const brushShape = useEditorStore((s) => s.brushShape);
   const pixelPerfect = useEditorStore((s) => s.pixelPerfect);
   const tool = useEditorStore((s) => s.tool);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState<null | "shape" | "size">(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
     const close = (e: MouseEvent) => {
-      if (!menuRef.current?.contains(e.target as Node)) setOpen(false);
+      if (!menuRef.current?.contains(e.target as Node)) setOpen(null);
     };
     window.addEventListener("mousedown", close);
     return () => window.removeEventListener("mousedown", close);
   }, [open]);
 
-  const shapes: { id: "circle" | "square" | "line"; icon: string; label: string }[] = [
-    { id: "circle", icon: "●", label: "Circle brush" },
-    { id: "square", icon: "■", label: "Square brush" },
-    { id: "line", icon: "╱", label: "Line brush" },
-  ];
+  const shapeIcon = brushShape === "circle" ? "●" : brushShape === "line" ? "╱" : "■";
 
   return (
     <div className="flex items-center gap-2 text-[11px] text-dim">
       <span className="capitalize text-ink">{tool}</span>
       <span className="text-edge2">|</span>
-      <div ref={menuRef} className="relative">
-        {open && (
-          <div className="pf-card absolute bottom-full left-0 z-30 mb-1.5 w-64 p-2 shadow-xl">
-            {/* brush shapes */}
-            <div className="mb-2 flex items-center gap-1">
-              {shapes.map((s) => (
+      <div ref={menuRef} className="flex items-center gap-1">
+        {/* separate brush-SHAPE menu (Aseprite style) */}
+        <div className="relative">
+          {open === "shape" && (
+            <div className="pf-card absolute left-0 top-full z-30 mt-1.5 flex gap-1 p-1.5 shadow-xl">
+              {([
+                { id: "circle", icon: "●", label: "Circle brush" },
+                { id: "square", icon: "■", label: "Square brush" },
+                { id: "line", icon: "╱", label: "Line brush" },
+              ] as const).map((s) => (
                 <button
                   key={s.id}
                   title={s.label}
-                  onClick={() => useEditorStore.getState().setBrushShape(s.id)}
+                  onClick={() => {
+                    useEditorStore.getState().setBrushShape(s.id);
+                    setOpen(null);
+                  }}
                   className={`pf-btn h-8 w-8 p-0 text-sm ${brushShape === s.id ? "is-on" : ""}`}
                 >
                   {s.icon}
                 </button>
               ))}
-              <span className="ml-auto text-[10px] text-faint">1 – 64 px</span>
             </div>
-            {/* slider with centered value */}
-            <div className="relative">
-              <span className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded border border-edge2 bg-panel px-2 py-0.5 font-mono text-xs text-ink">
-                {brushSize}
-              </span>
+          )}
+          <button
+            onClick={() => setOpen(open === "shape" ? null : "shape")}
+            title="Brush shape"
+            className="pf-btn h-7 w-8 p-0 text-[11px]"
+          >
+            {shapeIcon}
+          </button>
+        </div>
+        {/* brush SIZE popup: opens downward, plain slider + presets */}
+        <div className="relative">
+          {open === "size" && (
+            <div className="pf-card absolute left-0 top-full z-30 mt-1.5 w-64 p-2 shadow-xl">
               <input
                 type="range"
                 min={1}
@@ -146,27 +156,27 @@ function BrushSizeControl() {
                 onChange={(e) => useEditorStore.getState().setBrushSize(Number(e.target.value))}
                 className="h-1.5 w-full accent-[#58a6dd]"
               />
+              <div className="mt-2 flex gap-1">
+                {[1, 2, 4, 8, 16, 32, 64].map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => useEditorStore.getState().setBrushSize(s)}
+                    className={`pf-btn flex-1 p-0 py-0.5 text-[10px] ${brushSize === s ? "is-on" : ""}`}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="mt-2 flex gap-1">
-              {[1, 2, 4, 8, 16, 32, 64].map((s) => (
-                <button
-                  key={s}
-                  onClick={() => useEditorStore.getState().setBrushSize(s)}
-                  className={`pf-btn flex-1 p-0 py-0.5 text-[10px] ${brushSize === s ? "is-on" : ""}`}
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-        <button
-          onClick={() => setOpen((v) => !v)}
-          title="Brush size & shape"
-          className="pf-btn px-2 py-0.5"
-        >
-          <span className="w-10 text-center font-mono text-ink">{brushSize}px</span>
-        </button>
+          )}
+          <button
+            onClick={() => setOpen(open === "size" ? null : "size")}
+            title="Brush size"
+            className="pf-btn px-2 py-0.5"
+          >
+            <span className="w-10 text-center font-mono text-ink">{brushSize}px</span>
+          </button>
+        </div>
       </div>
       <span className="text-edge2">|</span>
       <label className="flex cursor-pointer items-center gap-1.5 select-none" title="Skip the middle pixel of diagonal steps so pencil lines stay clean">
