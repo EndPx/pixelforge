@@ -218,7 +218,7 @@ export function createEditorStore(width = 32, height = 32) {
       tiledMode: false,
       isPlaying: false,
       timelineVisible: true,
-      previewVisible: true,
+      previewVisible: false,
       tool: "pencil",
       selection: null,
       zoom: 16,
@@ -878,7 +878,13 @@ export function createEditorStore(width = 32, height = 32) {
       toggleGrid: () => setState((s) => ({ ...s, gridVisible: !s.gridVisible })),
       toggleOnionSkin: () => setState((s) => ({ ...s, onionSkin: !s.onionSkin })),
       toggleTiledMode: () => setState((s) => ({ ...s, tiledMode: !s.tiledMode })),
-      setZoom: (zoom) => setState((s) => ({ ...s, zoom: Math.max(2, Math.min(40, zoom)) })),
+      // LibreSprite allows extreme zoom levels; cap by canvas size so canvases
+      // never exceed the browser's max canvas dimension (~32767px).
+      setZoom: (zoom) =>
+        setState((s) => {
+          const max = Math.max(16, Math.floor(30000 / Math.max(s.width, s.height)));
+          return { ...s, zoom: Math.max(2, Math.min(max, zoom)) };
+        }),
       setWebmcpAvailable: (available) => setState((s) => ({ ...s, webmcpAvailable: available })),
       logActivity: (entry) =>
         setState((s) => ({

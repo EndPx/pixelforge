@@ -138,15 +138,9 @@ export default function App() {
       <div className="shrink-0 border-b border-edge px-2 pb-1">
         <MenuBar onFit={() => document.dispatchEvent(new CustomEvent("pixelforge:fit"))} />
       </div>
-      {/* row 3: tool options (LibreSprite-style context bar) */}
-      <div className="flex shrink-0 items-center gap-3 border-b border-edge bg-panel px-3 py-1">
-        <BrushSizeControl />
-        <span className="text-[10px] text-faint">Right-click paints secondary · Del clears selection · Space+drag pans · Scroll zooms</span>
-      </div>
-
-      {/* row 4: docks + canvas */}
+      {/* row 3: docks + canvas */}
       <div className="flex min-h-0 flex-1 gap-1 p-1">
-        {/* left dock: colors */}
+        {/* left dock: colors only */}
         <aside className="pf-card flex w-48 shrink-0 flex-col overflow-hidden">
           <div className="min-h-0 flex-1 overflow-y-auto">
             <Palette />
@@ -158,10 +152,18 @@ export default function App() {
           )}
         </aside>
 
-        {/* canvas */}
-        <main className="flex min-w-0 flex-1 flex-col overflow-hidden border border-edge bg-editor">
-          <Canvas />
-        </main>
+        {/* center: tool options directly above the canvas */}
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <div className="flex shrink-0 items-center gap-3 border border-edge bg-panel px-3 py-1">
+            <BrushSizeControl />
+            <span className="hidden text-[10px] text-faint lg:inline">
+              Right-click paints secondary · Del clears selection · Space+drag pans · Scroll zooms
+            </span>
+          </div>
+          <main className="flex min-h-0 flex-1 flex-col overflow-hidden border border-edge bg-editor">
+            <Canvas />
+          </main>
+        </div>
 
         {/* right: tool strip + agent panel */}
         <div className="flex shrink-0 gap-1">

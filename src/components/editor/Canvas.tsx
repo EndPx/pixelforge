@@ -407,7 +407,7 @@ export function Canvas() {
       const rect = container.getBoundingClientRect();
       const cx = (e.clientX - rect.left) / store.zoom; // content px under cursor
       const cy = (e.clientY - rect.top) / store.zoom;
-      const nz = Math.max(2, Math.min(40, store.zoom + (e.deltaY < 0 ? 2 : -2)));
+      const nz = store.zoom + (e.deltaY < 0 ? 2 : -2); // store clamps by canvas size
       setPan((p) => ({ x: p.x + cx * (store.zoom - nz), y: p.y + cy * (store.zoom - nz) }));
       store.setZoom(nz);
     };
@@ -418,7 +418,7 @@ export function Canvas() {
   const fitToWindow = useCallback(() => {
     const ws = workspaceRef.current;
     if (!ws || ws.clientWidth === 0) return;
-    const nz = Math.max(2, Math.min(40, Math.floor(Math.min((ws.clientWidth - 100) / width, (ws.clientHeight - 90) / height) / 2) * 2));
+    const nz = Math.floor(Math.min((ws.clientWidth - 100) / width, (ws.clientHeight - 90) / height) / 2) * 2;
     // flex centering already centers the canvas; fit = right zoom + zero pan
     setPan({ x: 0, y: 0 });
     useEditorStore.getState().setZoom(nz);

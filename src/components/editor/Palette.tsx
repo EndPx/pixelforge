@@ -90,8 +90,7 @@ export function Palette() {
     if (!rect) return;
     const s = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
     const v = 1 - Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
-    const hex = hsvToHex(hsv.h, s, v);
-    setActiveColor(hex);
+    setActiveColor(hsvToHex(hsv.h, s, v));
   };
 
   const huePick = (e: React.PointerEvent) => {
@@ -103,7 +102,27 @@ export function Palette() {
 
   return (
     <div className="flex flex-col gap-2.5 p-2.5">
-      {/* fg/bg pair — Pixelorama style */}
+      {/* palette grid on top — LibreSprite style */}
+      <div>
+        <div className="pf-label mb-1">Palette</div>
+        <div className="grid grid-cols-6 gap-px overflow-hidden rounded-sm border border-edge bg-edge p-px">
+          {palette.map((c) => (
+            <button
+              key={c}
+              onClick={() => setActiveColor(c)}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                setSecondaryColor(c);
+              }}
+              title={`${c} — left: primary · right: secondary`}
+              className={`h-5 w-full border ${activeColor === c ? "z-10 border-accent" : "border-transparent hover:border-white/40"}`}
+              style={{ backgroundColor: c }}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* fg/bg pair + load palette */}
       <div className="flex items-center gap-2">
         <div className="relative h-10 w-10 shrink-0">
           <label
@@ -121,9 +140,23 @@ export function Palette() {
             <input type="color" value={activeColor} onChange={(e) => setActiveColor(e.target.value)} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
           </label>
         </div>
-        <div className="flex min-w-0 flex-col gap-1">
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
           <button onClick={swapColors} title="Swap colors (X)" className="pf-btn text-[11px]">⇄ Swap</button>
-          <span className="font-mono text-[10px] leading-3 text-dim">{activeColor}</span>
+          <select
+            title="Load a ready-made palette"
+            defaultValue=""
+            onChange={(e) => {
+              const preset = PALETTE_PRESETS[e.target.value];
+              if (preset) useEditorStore.getState().setPalette(preset);
+              e.target.selectedIndex = 0;
+            }}
+            className="min-w-0 w-full rounded-sm border border-edge2 bg-app px-1 py-1 text-[10px] text-ink focus:border-accent focus:outline-none"
+          >
+            <option value="" disabled>Load palette…</option>
+            {Object.keys(PALETTE_PRESETS).map((name) => (
+              <option key={name} value={name}>{name}</option>
+            ))}
+          </select>
         </div>
       </div>
 
@@ -134,7 +167,7 @@ export function Palette() {
             ref={svRef}
             width={W}
             height={H}
-            className="cursor-crosshair rounded-md border border-edge2"
+            className="cursor-crosshair rounded-sm border border-edge2"
             onPointerDown={(e) => {
               (e.target as HTMLElement).setPointerCapture(e.pointerId);
               svPick(e);
@@ -153,7 +186,7 @@ export function Palette() {
             ref={hueRef}
             width={14}
             height={H}
-            className="cursor-crosshair rounded-md border border-edge2"
+            className="cursor-crosshair rounded-sm border border-edge2"
             onPointerDown={(e) => {
               (e.target as HTMLElement).setPointerCapture(e.pointerId);
               huePick(e);
@@ -169,53 +202,19 @@ export function Palette() {
         </div>
       </div>
 
-      <input
-        value={hexInput}
-        onChange={(e) => {
-          setHexInput(e.target.value);
-          const norm = normalizeHex(e.target.value);
-          if (norm) setActiveColor(norm);
-        }}
-        spellCheck={false}
-        placeholder="#38b764"
-        className="w-full border border-edge2 bg-app px-2 py-1 font-mono text-[11px] text-ink focus:border-accent focus:outline-none"
-      />
-
-      <div>
-        <div className="pf-label mb-1">Palette</div>
-        <div className="grid grid-cols-6 gap-px overflow-hidden rounded-md border border-edge bg-edge p-px">
-          {palette.map((c) => (
-            <button
-              key={c}
-              onClick={() => setActiveColor(c)}
-              onContextMenu={(e) => {
-                e.preventDefault();
-                setSecondaryColor(c);
-              }}
-              title={`${c} — kiri: utama · kanan: sekunder`}
-              className={`h-5 w-full border ${activeColor === c ? "z-10 border-accent" : "border-transparent hover:border-white/40"}`}
-              style={{ backgroundColor: c }}
-            />
-          ))}
-        </div>
-      </div>
-
-      <div className="flex items-center gap-1">
-        <select
-          title="Load a ready-made palette"
-          defaultValue=""
+      {/* hex at the very bottom — LibreSprite style */}
+      <div className="flex items-center gap-1.5">
+        <input
+          value={hexInput}
           onChange={(e) => {
-            const preset = PALETTE_PRESETS[e.target.value];
-            if (preset) useEditorStore.getState().setPalette(preset);
-            e.target.selectedIndex = 0;
+            setHexInput(e.target.value);
+            const norm = normalizeHex(e.target.value);
+            if (norm) setActiveColor(norm);
           }}
-          className="min-w-0 flex-1 rounded-lg border border-edge2 bg-app px-1.5 py-1 text-[11px] text-ink focus:border-accent focus:outline-none"
-        >
-          <option value="" disabled>Load palette…</option>
-          {Object.keys(PALETTE_PRESETS).map((name) => (
-            <option key={name} value={name}>{name}</option>
-          ))}
-        </select>
+          spellCheck={false}
+          placeholder="#38b764"
+          className="min-w-0 flex-1 border border-edge2 bg-app px-2 py-1 font-mono text-[11px] text-ink focus:border-accent focus:outline-none"
+        />
         <button
           onClick={() => addPaletteColor(activeColor)}
           title="Add the active color to the palette"
