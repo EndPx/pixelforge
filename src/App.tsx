@@ -161,24 +161,18 @@ function BrushSizeControl() {
           <div className="relative">
             {open === "size" && (
               <div className="pf-card absolute left-0 top-full z-50 mt-1.5 w-64 p-2 shadow-xl">
-                <input
-                  type="range"
-                  min={1}
-                  max={64}
-                  value={brushSize}
-                  onChange={(e) => useEditorStore.getState().setBrushSize(Number(e.target.value))}
-                  className="h-1.5 w-full accent-[#58a6dd]"
-                />
-                <div className="mt-2 flex gap-1">
-                  {[1, 2, 4, 8, 16, 32, 64].map((s) => (
-                    <button
-                      key={s}
-                      onClick={() => useEditorStore.getState().setBrushSize(s)}
-                      className={`pf-btn flex-1 p-0 py-0.5 text-[10px] ${brushSize === s ? "is-on" : ""}`}
-                    >
-                      {s}
-                    </button>
-                  ))}
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 rounded border border-edge2 bg-panel px-2 py-0.5 font-mono text-xs text-ink">
+                    {brushSize}px
+                  </span>
+                  <input
+                    type="range"
+                    min={1}
+                    max={64}
+                    value={brushSize}
+                    onChange={(e) => useEditorStore.getState().setBrushSize(Number(e.target.value))}
+                    className="h-1.5 w-full accent-[#58a6dd]"
+                  />
                 </div>
               </div>
             )}
