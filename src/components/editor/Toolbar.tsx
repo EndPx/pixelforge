@@ -36,6 +36,11 @@ const ICONS: Record<ToolId, React.ReactNode> = {
       <path d="M12 2v20M2 12h20M12 2l-3 3M12 2l3 3M12 22l-3-3M12 22l3-3M2 12l3-3M2 12l3 3M22 12l-3-3M22 12l-3 3" strokeLinecap="round" />
     </svg>
   ),
+  hand: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
+      <path d="M8 12V5.5a1.5 1.5 0 013 0V11m0-5.5v-1a1.5 1.5 0 013 0V11m0-5v1a1.5 1.5 0 013 0v6m0-3a1.5 1.5 0 013 0v4c0 4-2.5 7-7 7s-6-2-8-6l-1.6-3.2a1.4 1.4 0 012.4-1.4L8 13" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
 };
 
 const TOOLS: { id: ToolId; label: string; key: string }[] = [
@@ -45,6 +50,7 @@ const TOOLS: { id: ToolId; label: string; key: string }[] = [
   { id: "picker", label: "Color picker", key: "I" },
   { id: "select", label: "Rect select", key: "S" },
   { id: "move", label: "Move selection", key: "M" },
+  { id: "hand", label: "Hand (pan)", key: "H" },
 ];
 
 export function Toolbar() {

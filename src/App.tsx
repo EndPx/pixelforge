@@ -77,6 +77,7 @@ function useKeyboardShortcuts() {
         case "i": store.setTool("picker"); break;
         case "s": store.setTool("select"); break;
         case "m": store.setTool("move"); break;
+        case "h": store.setTool("hand"); break;
         case "[": store.setZoom(store.zoom - 2); break;
         case "]": store.setZoom(store.zoom + 2); break;
         case "x": store.swapColors(); break;

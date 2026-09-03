@@ -4,7 +4,8 @@ export type ToolId =
   | "fill"
   | "picker"
   | "select"
-  | "move";
+  | "move"
+  | "hand";
 
 /** A single pixel edit. `color` of null means transparent (erase). */
 export interface PixelInput {

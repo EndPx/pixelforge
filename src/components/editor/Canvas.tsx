@@ -100,7 +100,7 @@ export function Canvas() {
   const hoverRef = useRef<{ x: number; y: number } | null>(null);
   const panStartRef = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
   const spaceDownRef = useRef(false);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const viewportRef = useRef<HTMLDivElement>(null);
   const [coords, setCoords] = useState<{ x: number; y: number } | null>(null);
   const [zoomMenuOpen, setZoomMenuOpen] = useState(false);
   const zoomMenuRef = useRef<HTMLDivElement>(null);
@@ -382,9 +382,13 @@ export function Canvas() {
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
     const store = useEditorStore.getState();
 
-    // pan: space+drag or middle button
-    if (spaceDownRef.current || e.button === 1) {
-      panStartRef.current = { x: e.clientX, y: e.clientY, ox: pan.x, oy: pan.y };
+    // pan: hand tool, space+drag, or middle button
+    if (tool === "hand" || spaceDownRef.current || e.button === 1) {
+      const vp = viewportRef.current;
+      if (vp) {
+        panStartRef.current = { x: e.clientX, y: e.clientY, ox: vp.scrollLeft, oy: vp.scrollTop };
+        (e.target as HTMLElement).setPointerCapture(e.pointerId);
+      }
       return;
     }
 
@@ -443,10 +447,11 @@ export function Canvas() {
 
   const onPointerMove = (e: React.PointerEvent) => {
     if (panStartRef.current) {
-      setPan({
-        x: panStartRef.current.ox + (e.clientX - panStartRef.current.x),
-        y: panStartRef.current.oy + (e.clientY - panStartRef.current.y),
-      });
+      const vp = viewportRef.current;
+      if (vp) {
+        vp.scrollLeft = panStartRef.current.ox - (e.clientX - panStartRef.current.x);
+        vp.scrollTop = panStartRef.current.oy - (e.clientY - panStartRef.current.y);
+      }
       return;
     }
     const p = toPixel(e);
@@ -508,7 +513,7 @@ export function Canvas() {
 
   // Zoom anchored at the cursor position (consistent at every zoom level)
   useEffect(() => {
-    const el = workspaceRef.current;
+    const el = viewportRef.current;
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
@@ -516,11 +521,13 @@ export function Canvas() {
       const container = containerRef.current;
       if (!container) return;
       const rect = container.getBoundingClientRect();
-      const cx = (e.clientX - rect.left) / store.zoom;
+      const cx = (e.clientX - rect.left) / store.zoom; // content px under cursor
       const cy = (e.clientY - rect.top) / store.zoom;
-      const nz = store.zoom + (e.deltaY < 0 ? 2 : -2);
-      setPan((p) => ({ x: p.x + cx * (store.zoom - nz), y: p.y + cy * (store.zoom - nz) }));
+      const nz = store.zoom + (e.deltaY < 0 ? 2 : -2); // store clamps by canvas size
       store.setZoom(nz);
+      const vpRect = el.getBoundingClientRect();
+      el.scrollLeft = cx * store.zoom - (e.clientX - vpRect.left);
+      el.scrollTop = cy * store.zoom - (e.clientY - vpRect.top);
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
@@ -529,9 +536,13 @@ export function Canvas() {
   const fitToWindow = useCallback(() => {
     const ws = workspaceRef.current;
     if (!ws || ws.clientWidth === 0) return;
-    const nz = Math.floor(Math.min((ws.clientWidth - 100) / width, (ws.clientHeight - 90) / height) / 2) * 2;
-    setPan({ x: 0, y: 0 });
+    const nz = Math.max(2, Math.floor(Math.min((ws.clientWidth - 100) / width, (ws.clientHeight - 90) / height) / 2) * 2);
     useEditorStore.getState().setZoom(nz);
+    const vp = viewportRef.current;
+    if (vp) {
+      vp.scrollLeft = (width * nz - vp.clientWidth) / 2;
+      vp.scrollTop = (height * nz - vp.clientHeight) / 2;
+    }
   }, [width, height]);
 
   // re-fit when the canvas size changes (new project)
@@ -611,17 +622,20 @@ export function Canvas() {
     ),
   };
   const cursor = panning
-    ? "grab"
-    : tool === "move"
-      ? "move"
-      : (CURSORS[tool] ?? "crosshair");
+    ? "grabbing"
+    : tool === "hand"
+      ? "grab"
+      : tool === "move"
+        ? "move"
+        : (CURSORS[tool] ?? "crosshair");
 
   // Consistent checkerboard: always 8 canvas px per square, scaling linearly with zoom
   const checker = 8 * zoom;
 
   return (
     <div ref={workspaceRef} className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-workspace">
-      <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden p-6">
+      <div ref={viewportRef} className="flex min-h-0 flex-1 overflow-auto">
+        <div className="m-auto p-8">
         <div
           ref={containerRef}
           className="relative border border-black/60"
@@ -630,7 +644,6 @@ export function Canvas() {
             height: height * zoom,
             cursor,
             touchAction: "none",
-            transform: `translate(${pan.x}px, ${pan.y}px)`,
             background: `repeating-conic-gradient(#939393 0% 25%, #7d7d7d 0% 50%) 50% / ${checker * 2}px ${checker * 2}px`,
           }}
           onPointerDown={onPointerDown}
@@ -654,6 +667,7 @@ export function Canvas() {
             style={{ imageRendering: "pixelated", width: "100%", height: "100%" }}
           />
           <canvas ref={overlayRef} className="pointer-events-none absolute inset-0 h-full w-full" />
+        </div>
         </div>
       </div>
       {/* floating move-drag preview: spans the whole workspace so content stays
@@ -685,14 +699,14 @@ export function Canvas() {
                   step={2}
                   value={zoom}
                   onChange={(e) => {
-                    // anchor zooming at the canvas center while sliding
                     const store = useEditorStore.getState();
                     const nz = Number(e.target.value);
-                    setPan((pn) => ({
-                      x: pn.x + (width / 2) * (store.zoom - nz),
-                      y: pn.y + (height / 2) * (store.zoom - nz),
-                    }));
                     store.setZoom(nz);
+                    const vp = viewportRef.current;
+                    if (vp) {
+                      vp.scrollLeft = (width * nz - vp.clientWidth) / 2;
+                      vp.scrollTop = (height * nz - vp.clientHeight) / 2;
+                    }
                   }}
                   className="h-1.5 w-full accent-[#58a6dd]"
                 />
