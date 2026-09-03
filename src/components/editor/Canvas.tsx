@@ -621,10 +621,19 @@ export function Canvas() {
       9, 9,
     ),
   };
+  // Aseprite-style pixel hand cursors (open while hovering, fist while dragging)
+  const HAND_OPEN = svgCursor(
+    "<path d='M7 3V2a1.3 1.3 0 012.6 0v6m0-5.4V1.6a1.3 1.3 0 012.6 0V8m0-4.6a1.3 1.3 0 012.6 0V9m0-3a1.3 1.3 0 012.6 0v4.5c0 3.6-2.3 6-5.8 6H10c-2.4 0-3.6-.9-4.8-2.8L2.6 9.6c-.8-1.2.6-2.7 1.9-1.8L7 9.8V3z' fill='%23ffffff' stroke='%23000000' stroke-width='1.2' stroke-linejoin='round'/>",
+    9, 6,
+  );
+  const HAND_GRAB = svgCursor(
+    "<path d='M5 8V5.5a1.2 1.2 0 012.4 0V8m0-1.8V4.8a1.2 1.2 0 012.4 0V8m0-2.4a1.2 1.2 0 012.4 0V9m0-1.6a1.2 1.2 0 012.4 0v4c0 3.2-2 5.4-5.2 5.4H8.6c-2.1 0-3.2-.8-4.3-2.5l-1.6-2.6c-.7-1.1.5-2.4 1.7-1.6L6 12.6V6z' fill='%23ffffff' stroke='%23000000' stroke-width='1.2' stroke-linejoin='round'/>",
+    9, 9,
+  );
   const cursor = panning
-    ? "grabbing"
+    ? HAND_GRAB
     : tool === "hand"
-      ? "grab"
+      ? HAND_OPEN
       : tool === "move"
         ? "move"
         : (CURSORS[tool] ?? "crosshair");
