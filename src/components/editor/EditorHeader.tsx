@@ -1,5 +1,6 @@
 import { useEditorStore } from "../../editor/store";
 import { TOOL_DEFS } from "../../webmcp/tools";
+import logoUrl from "../../assets/logo.png";
 
 function WebMCPBadge() {
   const available = useEditorStore((s) => s.webmcpAvailable);
@@ -25,12 +26,12 @@ export function EditorHeader() {
   return (
     <>
       <div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2">
-        <div className="grid h-6 w-6 grid-cols-2 grid-rows-2 gap-px overflow-hidden rounded ring-1 ring-white/15">
-          <span className="bg-accent" />
-          <span className="bg-agent" />
-          <span className="bg-emerald-400" />
-          <span className="bg-amber-300" />
-        </div>
+        <img
+          src={logoUrl}
+          alt="PixelForge logo"
+          className="h-7 w-7 rounded"
+          style={{ imageRendering: "pixelated" }}
+        />
         <div className="leading-none">
           <span className="block text-xs font-bold tracking-tight text-ink">PixelForge</span>
           <span className="block text-[7px] uppercase tracking-[0.18em] text-faint">agent-native pixel studio</span>
