@@ -202,18 +202,32 @@ export function Canvas() {
         ctx.stroke();
       }
 
-      // brush cursor footprint
+      // brush cursor footprint — follows the selected brush shape
       const hover = hoverRef.current;
       if (hover && !strokeActiveRef.current && (tool === "pencil" || tool === "eraser") && brushSize > 1) {
         ctx.strokeStyle = "rgba(255,255,255,0.5)";
         ctx.lineWidth = 1;
         const half = Math.floor(brushSize / 2);
-        ctx.strokeRect(
-          (hover.x - half) * zoom + 0.5,
-          (hover.y - half) * zoom + 0.5,
-          brushSize * zoom - 1,
-          brushSize * zoom - 1,
-        );
+        const cx = (hover.x - half + brushSize / 2) * zoom;
+        const cy = (hover.y - half + brushSize / 2) * zoom;
+        const r = (brushSize * zoom) / 2;
+        if (brushShape === "circle") {
+          ctx.beginPath();
+          ctx.arc(cx, cy, r, 0, Math.PI * 2);
+          ctx.stroke();
+        } else if (brushShape === "line") {
+          ctx.beginPath();
+          ctx.moveTo((hover.x - half) * zoom + zoom / 2, (hover.y - half) * zoom);
+          ctx.lineTo((hover.x - half + brushSize) * zoom - zoom / 2, (hover.y - half + brushSize) * zoom);
+          ctx.stroke();
+        } else {
+          ctx.strokeRect(
+            (hover.x - half) * zoom + 0.5,
+            (hover.y - half) * zoom + 0.5,
+            brushSize * zoom - 1,
+            brushSize * zoom - 1,
+          );
+        }
       }
 
       // selection: marching ants
@@ -238,7 +252,7 @@ export function Canvas() {
         ctx.strokeRect(hover.x * zoom + 0.5, hover.y * zoom + 0.5, zoom - 1, zoom - 1);
       }
     },
-    [width, height, zoom, selection, tool, gridVisible, brushSize],
+    [width, height, zoom, selection, tool, gridVisible, brushSize, brushShape],
   );
 
   // redraw overlay on state changes
