@@ -260,6 +260,32 @@ export function Canvas() {
     drawOverlay();
   }, [drawOverlay, frames, activeLayerId, activeFrameId, onionSkin]);
 
+  // commit the active stroke exactly once — from pointerup, pointercancel,
+  // lostpointercapture, or a window-level fallback (embedded-browser safe)
+  const commitStrokeIfActive = useCallback(() => {
+    if (!strokeActiveRef.current) return;
+    strokeActiveRef.current = false;
+    const pixels = [...strokeRef.current.values()];
+    strokeRef.current.clear();
+    strokeOrderRef.current = [];
+    lastPointRef.current = null;
+    if (pixels.length > 0) {
+      useEditorStore.getState().drawPixels(pixels);
+    }
+    renderMain();
+    drawOverlay();
+  }, [renderMain, drawOverlay]);
+
+  useEffect(() => {
+    const safety = () => commitStrokeIfActive();
+    window.addEventListener("pointerup", safety);
+    window.addEventListener("pointercancel", safety);
+    return () => {
+      window.removeEventListener("pointerup", safety);
+      window.removeEventListener("pointercancel", safety);
+    };
+  }, [commitStrokeIfActive]);
+
   // marching-ants animation loop (only while a selection exists)
   useEffect(() => {
     if (!selection && !selectPreviewRef.current) return;
@@ -379,7 +405,11 @@ export function Canvas() {
   );
 
   const onPointerDown = (e: React.PointerEvent) => {
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    // Some embedded browsers (WebView2) can throw on setPointerCapture — never
+    // let that kill the drawing handler.
+    try {
+      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    } catch { /* ignore */ }
     const store = useEditorStore.getState();
 
     // pan: hand tool, space+drag, or middle button
@@ -387,7 +417,9 @@ export function Canvas() {
       const vp = viewportRef.current;
       if (vp) {
         panStartRef.current = { x: e.clientX, y: e.clientY, ox: vp.scrollLeft, oy: vp.scrollTop };
-        (e.target as HTMLElement).setPointerCapture(e.pointerId);
+        try {
+          (e.target as HTMLElement).setPointerCapture(e.pointerId);
+        } catch { /* ignore */ }
       }
       return;
     }
@@ -489,6 +521,7 @@ export function Canvas() {
       const pixels = [...strokeRef.current.values()];
       strokeRef.current.clear();
       strokeOrderRef.current = [];
+      lastPointRef.current = null;
       if (pixels.length > 0) {
         store.drawPixels(pixels);
       }
