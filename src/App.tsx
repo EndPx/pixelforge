@@ -96,6 +96,7 @@ function BrushSizeControl() {
   const pixelPerfect = useEditorStore((s) => s.pixelPerfect);
   const tool = useEditorStore((s) => s.tool);
   const [open, setOpen] = useState<null | "shape" | "size">(null);
+  const [popupPos, setPopupPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -133,7 +134,7 @@ function BrushSizeControl() {
           {/* shape menu */}
           <div ref={menuRef} className="relative">
             {open === "shape" && (
-              <div className="pf-card absolute left-0 top-full z-30 mt-1.5 flex gap-1 p-1.5 shadow-xl">
+              <div className="pf-card fixed z-50 flex gap-1 p-1.5 shadow-xl" style={{ left: popupPos.x, top: popupPos.y }}>
                 {shapes.map((s) => (
                   <button
                     key={s.id}
@@ -150,7 +151,11 @@ function BrushSizeControl() {
               </div>
             )}
             <button
-              onClick={() => setOpen(open === "shape" ? null : "shape")}
+              onClick={(e) => {
+                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                setPopupPos({ x: rect.left, y: rect.bottom + 6 });
+                setOpen(open === "shape" ? null : "shape");
+              }}
               title="Brush shape"
               className="pf-btn h-7 w-8 p-0 text-[11px]"
             >
@@ -160,7 +165,7 @@ function BrushSizeControl() {
           {/* size popup */}
           <div className="relative">
             {open === "size" && (
-              <div className="pf-card absolute left-0 top-full z-30 mt-1.5 w-64 p-2 shadow-xl">
+              <div className="pf-card fixed z-50 w-64 p-2 shadow-xl" style={{ left: popupPos.x, top: popupPos.y }}>
                 <input
                   type="range"
                   min={1}

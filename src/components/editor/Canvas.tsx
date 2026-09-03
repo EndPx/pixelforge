@@ -172,12 +172,31 @@ export function Canvas() {
     }
   }, [frames, frameIndex, width, height, onionSkin]);
 
+  const [zoomPos, setZoomPos] = useState<{ x: number; y: number } | null>(null);
+  // two-segment log scale: slider midpoint (1000) = 100%, left reaches 12%, right reaches 6400%
+  const Z_MIN = 2, Z_MID = 16, Z_MAX = 1024;
+  const tToZoom = (t: number) => {
+    const z = t <= 1000
+      ? Z_MIN * Math.pow(Z_MID / Z_MIN, t / 1000)
+      : Z_MID * Math.pow(Z_MAX / Z_MID, (t - 1000) / 1000);
+    return Math.max(2, Math.min(1024, Math.round(z / 2) * 2));
+  };
+  const tToZoomInv = (zRaw: number) => {
+    const z = Math.max(Z_MIN, Math.min(Z_MAX, zRaw));
+    return Math.round(
+      z <= Z_MID
+        ? 1000 * (Math.log(z / Z_MIN) / Math.log(Z_MID / Z_MIN))
+        : 1000 + 1000 * (Math.log(z / Z_MID) / Math.log(Z_MAX / Z_MID)),
+    );
+  };
+
   const drawOverlay = useCallback(
     (dashOffset = 0) => {
       const canvas = overlayRef.current;
       if (!canvas) return;
-      const w = width * zoom;
-      const h = height * zoom;
+      const oz = Math.min(zoom, 400); // cap overlay resolution for extreme zoom
+      const w = width * oz;
+      const h = height * oz;
       if (canvas.width !== w || canvas.height !== h) {
         canvas.width = w;
         canvas.height = h;
@@ -187,17 +206,17 @@ export function Canvas() {
       ctx.clearRect(0, 0, w, h);
 
       // pixel grid (View > Pixel grid, off by default)
-      if (gridVisible && zoom >= 6) {
+      if (gridVisible && oz >= 6) {
         ctx.strokeStyle = "rgba(0,0,0,0.22)";
         ctx.lineWidth = 1;
         ctx.beginPath();
         for (let x = 1; x < width; x++) {
-          ctx.moveTo(x * zoom + 0.5, 0);
-          ctx.lineTo(x * zoom + 0.5, h);
+          ctx.moveTo(x * oz + 0.5, 0);
+          ctx.lineTo(x * oz + 0.5, h);
         }
         for (let y = 1; y < height; y++) {
-          ctx.moveTo(0, y * zoom + 0.5);
-          ctx.lineTo(w, y * zoom + 0.5);
+          ctx.moveTo(0, y * oz + 0.5);
+          ctx.lineTo(w, y * oz + 0.5);
         }
         ctx.stroke();
       }
@@ -210,22 +229,22 @@ export function Canvas() {
         const half = Math.floor(brushSize / 2);
         const cx = (hover.x - half + brushSize / 2) * zoom;
         const cy = (hover.y - half + brushSize / 2) * zoom;
-        const r = (brushSize * zoom) / 2;
+        const r = (brushSize * oz) / 2;
         if (brushShape === "circle") {
           ctx.beginPath();
           ctx.arc(cx, cy, r, 0, Math.PI * 2);
           ctx.stroke();
         } else if (brushShape === "line") {
           ctx.beginPath();
-          ctx.moveTo((hover.x - half) * zoom + zoom / 2, (hover.y - half) * zoom);
-          ctx.lineTo((hover.x - half + brushSize) * zoom - zoom / 2, (hover.y - half + brushSize) * zoom);
+          ctx.moveTo((hover.x - half) * oz + zoom / 2, (hover.y - half) * oz);
+          ctx.lineTo((hover.x - half + brushSize) * oz - zoom / 2, (hover.y - half + brushSize) * oz);
           ctx.stroke();
         } else {
           ctx.strokeRect(
-            (hover.x - half) * zoom + 0.5,
-            (hover.y - half) * zoom + 0.5,
-            brushSize * zoom - 1,
-            brushSize * zoom - 1,
+            (hover.x - half) * oz + 0.5,
+            (hover.y - half) * oz + 0.5,
+            brushSize * oz - 1,
+            brushSize * oz - 1,
           );
         }
       }
@@ -237,10 +256,10 @@ export function Canvas() {
         ctx.lineWidth = 1;
         ctx.setLineDash([4, 4]);
         ctx.lineDashOffset = -dashOffset;
-        ctx.strokeRect(rect.x * zoom + 0.5, rect.y * zoom + 0.5, rect.width * zoom - 1, rect.height * zoom - 1);
+        ctx.strokeRect(rect.x * oz + 0.5, rect.y * oz + 0.5, rect.width * oz - 1, rect.height * oz - 1);
         ctx.strokeStyle = "#ffffff";
         ctx.lineDashOffset = -dashOffset + 4;
-        ctx.strokeRect(rect.x * zoom + 0.5, rect.y * zoom + 0.5, rect.width * zoom - 1, rect.height * zoom - 1);
+        ctx.strokeRect(rect.x * oz + 0.5, rect.y * oz + 0.5, rect.width * oz - 1, rect.height * oz - 1);
         ctx.setLineDash([]);
         ctx.lineDashOffset = 0;
       }
@@ -249,7 +268,7 @@ export function Canvas() {
       if (hover && !strokeActiveRef.current && brushSize === 1) {
         ctx.strokeStyle = "rgba(255,255,255,0.45)";
         ctx.lineWidth = 1;
-        ctx.strokeRect(hover.x * zoom + 0.5, hover.y * zoom + 0.5, zoom - 1, zoom - 1);
+        ctx.strokeRect(hover.x * oz + 0.5, hover.y * oz + 0.5, zoom - 1, zoom - 1);
       }
     },
     [width, height, zoom, selection, tool, gridVisible, brushSize, brushShape],
@@ -728,21 +747,21 @@ export function Canvas() {
         </span>
         <span className="ml-auto">Frame: {frameIndex + 1}</span>
         <div ref={zoomMenuRef} className="relative">
-          {zoomMenuOpen && (
-            <div className="pf-card absolute bottom-full right-0 z-30 mb-1 w-72 p-2 shadow-xl">
+          {zoomMenuOpen && zoomPos && (
+            <div className="pf-card fixed z-50 w-72 p-2 shadow-xl" style={{ left: zoomPos.x - 144, top: zoomPos.y - 64 }}>
               <div className="relative">
                 <span className="pointer-events-none absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 rounded border border-edge2 bg-panel px-2 py-0.5 font-mono text-xs text-ink">
                   {Math.round((zoom / 16) * 100)}%
                 </span>
                 <input
                   type="range"
-                  min={2}
-                  max={Math.max(16, Math.floor(30000 / Math.max(width, height)))}
-                  step={2}
-                  value={zoom}
+                  min={0}
+                  max={2000}
+                  step={1}
+                  value={tToZoomInv(zoom)}
                   onChange={(e) => {
                     const store = useEditorStore.getState();
-                    const nz = Number(e.target.value);
+                    const nz = tToZoom(Number(e.target.value));
                     store.setZoom(nz);
                     const vp = viewportRef.current;
                     if (vp) {
@@ -757,7 +776,11 @@ export function Canvas() {
           )}
           <button
             className="pf-btn px-1.5"
-            onClick={() => setZoomMenuOpen((v) => !v)}
+            onClick={(e) => {
+              const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+              setZoomPos({ x: rect.left + rect.width / 2, y: rect.top });
+              setZoomMenuOpen((v) => !v);
+            }}
             title="Choose zoom level"
           >
             <span className="w-10 text-center tabular-nums text-ink">{Math.round((zoom / 16) * 100)}%</span>
