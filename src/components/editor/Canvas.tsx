@@ -172,7 +172,6 @@ export function Canvas() {
     }
   }, [frames, frameIndex, width, height, onionSkin]);
 
-  const [zoomPos, setZoomPos] = useState<{ x: number; y: number } | null>(null);
   // two-segment log scale: slider midpoint (1000) = 100%, left reaches 12%, right reaches 6400%
   const Z_MIN = 2, Z_MID = 16, Z_MAX = 1024;
   const tToZoom = (t: number) => {
@@ -747,8 +746,8 @@ export function Canvas() {
         </span>
         <span className="ml-auto">Frame: {frameIndex + 1}</span>
         <div ref={zoomMenuRef} className="relative">
-          {zoomMenuOpen && zoomPos && (
-            <div className="pf-card fixed z-50 w-72 p-2 shadow-xl" style={{ left: zoomPos.x - 144, top: zoomPos.y - 64 }}>
+          {zoomMenuOpen && (
+            <div className="pf-card absolute bottom-full right-0 z-50 mb-1 w-72 p-2 shadow-xl">
               <div className="relative">
                 <span className="pointer-events-none absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 rounded border border-edge2 bg-panel px-2 py-0.5 font-mono text-xs text-ink">
                   {Math.round((zoom / 16) * 100)}%
@@ -776,11 +775,7 @@ export function Canvas() {
           )}
           <button
             className="pf-btn px-1.5"
-            onClick={(e) => {
-              const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-              setZoomPos({ x: rect.left + rect.width / 2, y: rect.top });
-              setZoomMenuOpen((v) => !v);
-            }}
+            onClick={() => setZoomMenuOpen((v) => !v)}
             title="Choose zoom level"
           >
             <span className="w-10 text-center tabular-nums text-ink">{Math.round((zoom / 16) * 100)}%</span>

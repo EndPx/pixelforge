@@ -96,7 +96,6 @@ function BrushSizeControl() {
   const pixelPerfect = useEditorStore((s) => s.pixelPerfect);
   const tool = useEditorStore((s) => s.tool);
   const [open, setOpen] = useState<null | "shape" | "size">(null);
-  const [popupPos, setPopupPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -134,7 +133,7 @@ function BrushSizeControl() {
           {/* shape menu */}
           <div ref={menuRef} className="relative">
             {open === "shape" && (
-              <div className="pf-card fixed z-50 flex gap-1 p-1.5 shadow-xl" style={{ left: popupPos.x, top: popupPos.y }}>
+              <div className="pf-card absolute left-0 top-full z-50 mt-1.5 flex gap-1 p-1.5 shadow-xl">
                 {shapes.map((s) => (
                   <button
                     key={s.id}
@@ -151,11 +150,7 @@ function BrushSizeControl() {
               </div>
             )}
             <button
-              onClick={(e) => {
-                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                setPopupPos({ x: rect.left, y: rect.bottom + 6 });
-                setOpen(open === "shape" ? null : "shape");
-              }}
+              onClick={() => setOpen(open === "shape" ? null : "shape")}
               title="Brush shape"
               className="pf-btn h-7 w-8 p-0 text-[11px]"
             >
@@ -165,7 +160,7 @@ function BrushSizeControl() {
           {/* size popup */}
           <div className="relative">
             {open === "size" && (
-              <div className="pf-card fixed z-50 w-64 p-2 shadow-xl" style={{ left: popupPos.x, top: popupPos.y }}>
+              <div className="pf-card absolute left-0 top-full z-50 mt-1.5 w-64 p-2 shadow-xl">
                 <input
                   type="range"
                   min={1}
@@ -268,7 +263,7 @@ export default function App() {
 
         {/* center: tool options above canvas, timeline below */}
         <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <div className="flex shrink-0 items-center gap-3 border border-edge bg-panel px-3 py-1">
+          <div className="relative z-30 flex shrink-0 items-center gap-3 border border-edge bg-panel px-3 py-1">
             <BrushSizeControl />
             <span className="hidden text-[10px] text-faint lg:inline">
               Right-click paints secondary · Del clears selection · Space+drag pans · Scroll zooms
