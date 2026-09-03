@@ -129,9 +129,9 @@ function BrushSizeControl() {
       <span className="text-edge2">|</span>
 
       {(tool === "pencil" || tool === "eraser") && (
-        <>
+        <div ref={menuRef} className="flex items-center gap-1">
           {/* shape menu */}
-          <div ref={menuRef} className="relative">
+          <div className="relative">
             {open === "shape" && (
               <div className="pf-card absolute left-0 top-full z-50 mt-1.5 flex gap-1 p-1.5 shadow-xl">
                 {shapes.map((s) => (
@@ -194,7 +194,7 @@ function BrushSizeControl() {
             />
             Pixel-perfect
           </label>
-        </>
+        </div>
       )}
 
       {hints[tool] && <span className="text-faint">{hints[tool]}</span>}
