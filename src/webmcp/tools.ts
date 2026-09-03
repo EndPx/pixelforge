@@ -127,6 +127,12 @@ export const TOOL_DEFS: WebMCPToolDefinition[] = [
     execute: async () => {
       const s = useEditorStore.getState();
       const frame = getActiveFrame(s);
+      s.logActivity({
+        actor: AGENT,
+        action: "get_editor_state",
+        description: "Inspected editor state",
+        ok: true,
+      });
       return ok("get_editor_state", "Current editor state", {
         canvas: { width: s.width, height: s.height },
         activeFrame: s.frames.findIndex((f) => f.id === s.activeFrameId) + 1,
@@ -200,6 +206,12 @@ export const TOOL_DEFS: WebMCPToolDefinition[] = [
         }
         rows.push(row);
       }
+      s.logActivity({
+        actor: AGENT,
+        action: "get_region",
+        description: `Read region (${x0}, ${y0}) ${x1 - x0}×${y1 - y0} on "${layer.name}"`,
+        ok: true,
+      });
       return ok("get_region", `Region (${x0},${y0}) ${x1 - x0}x${y1 - y0} on layer "${layer.name}"`, {
         region: { x: x0, y: y0, width: x1 - x0, height: y1 - y0 },
         layer: layer.name,
