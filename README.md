@@ -1,6 +1,9 @@
-# PixelForge
+<p align="center">
+  <img src="branding/lockup.png" alt="PixelForge — humans + agents, one canvas" width="70%" />
+</p>
 
-<img src="branding/og-banner.png" alt="PixelForge — humans + agents, one canvas" width="100%" />
+<h1 align="center">PixelForge</h1>
+<p align="center"><i>An agent-native pixel art studio — humans + agents, one canvas.</i></p>
 
 <img src="branding/mascot.png" alt="PixelForge mascot" width="180" align="right" />
 
