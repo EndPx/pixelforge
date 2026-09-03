@@ -1,5 +1,7 @@
 # PixelForge
 
+<img src="branding/og-banner.png" alt="PixelForge — humans + agents, one canvas" width="100%" />
+
 <img src="branding/mascot.png" alt="PixelForge mascot" width="180" align="right" />
 
 > **An agent-native pixel art studio** — where humans and AI agents collaborate on the same canvas.
