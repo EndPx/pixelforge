@@ -5,53 +5,80 @@
 <h1 align="center">PixelForge</h1>
 <p align="center"><i>An agent-native pixel art studio — humans + agents, one canvas.</i></p>
 
-<img src="branding/mascot.png" alt="PixelForge mascot" width="180" align="right" />
+<p align="center">
+  <a href="https://pixelforge-webmcp.netlify.app/"><b>▶ Live app</b></a> ·
+  <a href="#testing-instructions-for-judges"><b>How to test</b></a> ·
+  <a href="#webmcp-tools"><b>19 WebMCP tools</b></a> ·
+  <a href="LICENSE"><b>MIT License</b></a>
+</p>
 
-> **An agent-native pixel art studio** — where humans and AI agents collaborate on the same canvas.
+<img src="branding/mascot.png" alt="PixelForge mascot — a pixel slime blacksmith" width="170" align="right" />
 
-The editing experience follows the classic pixel-art studio model: cel-based layers × frames animation, onion skinning, a live preview, ready-made palettes, tiled drawing and rulers — with WebMCP as a first-class second interface to all of it.
+> A pixel art editor built from scratch so that an AI agent can operate it as a **first-class user** — not generate pictures for you, but actually *use the software*, side by side with you, on the same canvas.
 
-PixelForge is a browser-based pixel-art editor built for the [WebMCP Challenge](https://webmcp.devpost.com/). It is not an "AI image generator": the AI agent **operates the editor itself** through [WebMCP](https://webmachinelearning.github.io/webmcp/) tools, using the exact same editor actions as the human. The agent draws pixels, manages layers and frames, recolors artwork, and exports sprite sheets — while every operation streams into a live activity panel and every one of them is undoable.
+**Submission for the [OpenAI WebMCP Challenge](https://webmcp.devpost.com/).** Built entirely during the Submission Period (Aug 25 – Sep 3, 2026) — see the [commit history](https://github.com/EndPx/pixelforge/commits/main) for evidence.
 
-**Live app:** https://pixelforge-webmcp.netlify.app
-**Mirror:** https://endpx.github.io/pixelforge/
+---
 
-## Why WebMCP
+## Testing instructions for judges
 
-Traditional "AI image" workflows are one-shot: prompt → PNG → import → manual fixing. PixelForge exposes a **structured creative interface** via `document.modelContext.registerTool()`, so an agent can:
+**No login or account is needed — the app is free and open.**
 
-- **inspect** the real editor state and read actual pixel regions before acting,
-- **edit contextually** ("make the eyes smaller and move them down one pixel") instead of regenerating,
-- **compose primitives** (create layer → draw → select region → move → flip) into multi-step workflows,
-- **animate** by creating and modifying timeline frames,
-- **recolor** the whole animation in one call,
-- **export** a production sprite sheet.
+1. **ChatGPT desktop app (recommended):** open `https://pixelforge-webmcp.netlify.app/` in ChatGPT's in-app browser, then ask ChatGPT:
+   > *"Create a cute green slime with a face, then turn it into a 4-frame idle animation."*
+   The 19 registered tools appear under **Site tools** in the address bar; every tool call streams into the **Agent Activity** panel on the right.
+2. **Google Chrome 149+:** enable `chrome://flags/#enable-webmcp-testing`, relaunch, open the same URL — the header badge flips to **"WebMCP live · 19 tools"**.
+3. **Any other browser (manual QA):** the page exposes an honest debug bridge (not WebMCP):
+   ```js
+   __pixelforge.listTools()
+   await __pixelforge.call("draw_pixels", { pixels: [{ x: 5, y: 5, color: "#38b764" }] })
+   ```
 
-The agent shares the canvas with the human — the same state, the same undo history, visible on the same screen.
+The demo video link is on the Devpost submission page.
 
-## Human + Agent workflow
+---
 
-```text
-Human intent
-      ↓
-AI Agent (ChatGPT in-app browser / any WebMCP client)
-      ↓
-WebMCP tools (document.modelContext)
-      ↓
-Editor Actions  ←── Human UI (mouse / keyboard)
-      ↓
-Editor State
-      ↓
-Canvas · Layers · Timeline
+## Why this is a strong fit for WebMCP
+
+**The problem:** AI "editors" today are one-shot generators. You prompt, they hand you a file, and *you* fix it by hand. The agent never touches the actual software, so iteration means regenerating everything — and losing whatever you liked.
+
+**Why a pixel editor is the right shape for WebMCP:** pixel art is 100% structured state — a grid of colors, layers, frames, and a palette. That maps *exactly* onto tool schemas: an agent doesn't need vision or guesswork to "see" the canvas; it can read exact pixel data via `get_region`, then act through the same primitives a human uses. Creative tools are also naturally **iterative** — the value is in small, targeted edits ("move the eyes down one pixel"), which is precisely what structured tools enable and what one-shot generation cannot do.
+
+**What people and agents can now do together (difficult or impossible before):**
+
+- **Shared state, zero handoff.** The agent draws layer 3 while you refine layer 2 — same canvas, same editor, live. Previously you'd generate an image, import it, and lose the agent's ability to make targeted edits.
+- **Contextual edits instead of regeneration.** *"The eyes are too big — make them smaller and shift them down"* becomes `get_region` → `erase_pixels` → `draw_pixels` on the existing artwork, not a re-roll of the whole image.
+- **A shared, auditable history.** Every agent operation flows through the *same* action layer as the human UI — so it appears in the activity feed with an `AGENT` badge and is fully **undoable** by the human. Trust comes from visibility: you watch every tool call land on your canvas.
+- **Batched precision.** The agent places 167 pixels in one `draw_pixels` call; recolors the whole animation in one `replace_color`; exports a finished sprite sheet via `export_sprite_sheet`.
+
+## How WebMCP is implemented
+
+Registration happens at page load via the standard imperative API:
+
+```js
+document.modelContext.registerTool({
+  name: "draw_pixels",
+  description: "Draw one or many pixels at once on the pixel canvas…",
+  inputSchema: { type: "object", properties: { pixels: { … }, layer: { … } }, required: ["pixels"] },
+  execute: async (input) => {
+    /* validate → call the same store action as the human UI → return structured JSON */
+  },
+});
 ```
 
-Both surfaces converge on **one action layer**. There is no separate "AI drawing implementation" — WebMCP tools call the same store actions the human UI calls.
+Key implementation decisions:
+
+- **One action layer, two users.** All 19 tools call the same Zustand store actions as the mouse/keyboard (`drawPixels`, `floodFill`, `createFrame`, `moveRegion`…). There is no separate "AI drawing" code path — which is why agent edits are history-tracked, replayable, and visually identical to human edits.
+- **Structured results & errors.** Every tool returns `{ success, operation, detail, … }` or `{ success: false, error: { code, message } }` (`INVALID_COORDINATE`, `LAYER_NOT_FOUND`, `NO_SELECTION`, …) so the agent can reason about failures instead of guessing.
+- **Strict JSON schemas** with batched operations (`draw_pixels` takes an array — no one-tool-call-per-pixel), layer/frame references resolvable **by id or name**, and idempotent operations (`replace_color` twice ⇒ zero changes).
+- **Honest availability.** When the WebMCP API is absent, the badge shows *"WebMCP inactive"* and nothing is faked; a clearly-labeled debug bridge exists for manual QA only.
+- **Verified by tests:** 38 unit tests cover editor actions and tool contracts (schema validity, batched draws, structured errors, undoability of agent mutations).
 
 ## Features
 
-**Human editor** (Aseprite/LibreSprite-inspired) — pencil / eraser / flood fill / color picker / rect select / move; **fg/bg colors** (right-click paints or picks the secondary color, `X` swaps); **brush sizes** 1–4; **cel-matrix timeline** (layers × frames with thumbnails, LibreSprite-style); **onion skinning**; **live animation preview** panel; **tiled mode** (drawings wrap around edges); **palette presets** (Sweetie 16, PICO-8, DB16); pixel grid toggle; pan (space / middle-mouse); zoom; undo/redo; marching-ants selection; PNG / **animated GIF** / sprite-sheet export; localStorage save/load.
+**Human editor (Aseprite/LibreSprite-inspired):** pencil / eraser / flood fill / color picker / rect select / move / hand; fg/bg colors with right-click painting and swap (`X`); brush shapes (circle/square/line) sized 1–64px; pixel-perfect strokes; cel-matrix **timeline** (layers × frames) with playback and FPS control; **onion skinning**; floating live **preview**; ready-made palettes (Sweetie 16, PICO-8, DB16) with sort & gradient tools; "new palette from sprite"; tiled drawing mode; pixel grid toggle; pan (hand tool / space / scrollbars); zoom to 6400%; PNG / **animated GIF** / sprite-sheet export; localStorage save/load.
 
-**Agent surface** — 19 WebMCP tools (below), a live **Agent Activity** panel showing every tool call with actor badges, structured success/error results, batched pixel operations, and full undoability of agent edits.
+**Agent surface:** 19 WebMCP tools below, a live **Agent Activity** panel showing every tool call with `HUMAN`/`AGENT` badges, structured success/error results, and full undoability of agent edits.
 
 ## WebMCP tools
 
@@ -69,8 +96,6 @@ Both surfaces converge on **one action layer**. There is no separate "AI drawing
 | Export | `export_sprite_sheet` | Download all frames as a sprite sheet, returns metadata + data URL |
 | Export | `export_animation_gif` | Download the whole animation as an animated GIF |
 
-Every tool returns structured JSON — `{ success, operation, detail, ... }` or `{ success: false, error: { code, message } }` — so the agent can reason about failures instead of guessing.
-
 ## Architecture
 
 ```text
@@ -79,46 +104,38 @@ src/
 │   ├── store.ts        # Zustand store: shared actions + snapshot undo/redo + activity log
 │   ├── colors.ts       # Hex helpers + flood fill
 │   ├── render.ts       # Layer compositing → ImageData
-│   ├── export.ts       # PNG + sprite sheet
+│   ├── export.ts       # PNG + sprite sheet + animated GIF
 │   └── serialize.ts    # Project save/load (localStorage)
 ├── webmcp/
 │   ├── tools.ts        # 19 tool definitions (name/description/schema/execute)
 │   ├── registerTools.ts# document.modelContext registration + debug bridge
 │   └── modelContext.ts # WebMCP API type declarations
 ├── components/
-│   ├── editor/         # Canvas, Toolbar, Palette, LayersPanel, Timeline, Header
+│   ├── editor/         # Canvas, Toolbar, Palette, CelTimeline, MenuBar, …
 │   └── agent/          # AgentPanel (live tool-call log)
 └── types.ts
 ```
 
-Human UI and WebMCP tools both call `useEditorStore` actions (`drawPixels`, `floodFill`, `createFrame`, …). Each mutation pushes a snapshot for undo and an entry into the activity log tagged with its **actor** (`human` or `agent`).
+```text
+Human intent                          AI Agent
+      ↓ (mouse / keyboard)            ↓ (WebMCP tools)
+      └────────► Editor Actions ◄─────┘
+                     ↓
+               Editor State  (snapshot undo/redo · activity log)
+                     ↓
+         Canvas · Layers · Timeline · Exports
+```
 
 ## Running it
 
 ```bash
 npm install
 npm run dev        # http://localhost:5173
-npm test           # 36 unit tests
+npm test           # 38 unit tests
 npm run build      # production build to dist/
 ```
 
-### Testing the agent experience
-
-1. **ChatGPT desktop app** — open the live URL in ChatGPT's in-app browser (Site tools appears in the address bar) and prompt: *"Create a cute green slime character, then turn it into a 4-frame idle animation."*
-2. **Chrome with the WebMCP flag** (Chrome 149+):
-   1. Open `chrome://flags/#enable-webmcp-testing` in the address bar
-   2. Switch the dropdown from **Default** to **Enabled**
-   3. Click **Relaunch** (bottom-right)
-   4. Open https://pixelforge-webmcp.netlify.app — the header badge flips to **"WebMCP live · 19 tools"**
-   5. Optionally install the **Model Context Tool Inspector** extension from the Chrome Web Store to browse the registered tools, invoke them manually, and inspect the structured JSON results — it imitates how an agent sees the page
-   6. If the flag is missing, update Chrome via `chrome://settings/help`; after a major Chrome update the flag may reset to Default (just re-enable it)
-3. **Any browser (manual QA)** — the page installs an honest debug bridge (it is *not* WebMCP):
-   ```js
-   __pixelforge.listTools()
-   await __pixelforge.call("draw_pixels", { pixels: [{ x: 5, y: 5, color: "#38b764" }] })
-   ```
-
-Until the flag is enabled (or inside ChatGPT's browser), the header badge shows **"WebMCP inactive"** — that is correct behavior, and registration is never faked.
+Deployed on Netlify (`npx netlify-cli deploy --prod --dir=dist`); GitHub Pages mirror via `npx gh-pages -d dist`.
 
 ## License
 
